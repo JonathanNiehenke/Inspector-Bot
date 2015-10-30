@@ -26,7 +26,6 @@ Bot that plays a game of Minesweeper by reading the screen, making
 #   Make as simple as possible without losing functionality.
 #   Simple implementation is easier to build, fix and modify.
 
-import sys
 from collections import OrderedDict
 from random import choice
 from time import sleep, time
@@ -38,6 +37,7 @@ import win_terface
 class MinesweeperInterface(OrderedDict):
 
     cipher = {
+        (192, 192, 192): 0,
         (0, 0, 255): 1,
         (0, 128, 0): 2,
         (255, 0, 0): 3,
@@ -46,7 +46,8 @@ class MinesweeperInterface(OrderedDict):
         (0, 128, 128): 6,
         (0, 0, 0): 7,
         (128, 128, 128): 8,
-        (192, 192, 192, 0): 0,  # Empty
+        # (192, 192, 192, 0): 0,  # Empty
+        (0, 0, 0, 0): 'M', # Mine
         (128, 128, 128, 0): 'C',  # Covered
         }
 
@@ -57,6 +58,8 @@ class MinesweeperInterface(OrderedDict):
         self.width = (Right - self.left)//self.tile_size
         self.height = (Bot - self.top)//self.tile_size
         self.reset_button = (self.width/2.25, -2.5)
+        self.reset()
+        exit()
         Keys = [(X, Y) for Y in range(self.height) for X in range(self.width)]
         self.unsolved = set(Keys)
         self.read_field(Keys)
@@ -72,8 +75,8 @@ class MinesweeperInterface(OrderedDict):
         if Keys is None:
             Keys = self.unsolved.copy()
         boardImage = ImageGrab.grab(self.position)
-        boardImage.save(
-            r'E:\Pictures\Minesweeper/M{:.0f}.bmp'.format(time()), 'BMP')
+        # boardImage.save(
+            # r'E:\Pictures\Minesweeper/M{:.0f}.bmp'.format(time()), 'BMP')
         for X, Y in Keys.copy():
             self[(X, Y)] = self.identify_cell_value(X, Y, boardImage)
 
@@ -81,31 +84,31 @@ class MinesweeperInterface(OrderedDict):
         if fieldImage is None:
             fieldImage = ImageGrab.grab(self.position)
         tileX, tileY = self.tile_size * X, self.tile_size * Y
-        Color = fieldImage.getpixel((tileX + 7, tileY + 4))
+        macroColor = fieldImage.getpixel((tileX + 14, tileY + 8)) 
         try:
-            Value = self.cipher[Color]
+            Value = self.cipher[macroColor + (0,)]
         except KeyError:
-            Color = fieldImage.getpixel((tileX + 14, tileY + 8))
-            Value = self.cipher[Color + (0,)]
+            valueColor = fieldImage.getpixel((tileX + 7, tileY + 4))
+            Value = self.cipher[valueColor]
         return Value
 
-    # def identify_cell_value(self, X, Y, fieldImage):
-        # tileX, tileY = self.tile_size * X, self.tile_size * Y
-        # macroColor = fieldImage.getpixel((tileX + 14, tileY + 8)) 
-        # try:
-            # Value = self.cipher[macroColor + (0,)]
-        # except KeyError:
-            # valueColor = fieldImage.getpixel((tileX + 7, tileY + 4))
-            # Value = self.cipher[valueColor]
-        # return Value
-
     def reset(self):
-        self.preform_to_cell(self.reset_button, 'Open')
+        self.open_cells(self.reset_button)
 
-    def preform_to_cell(self, targetIndex, Action):
-        actionDict = {'Open': ('Left', 'Click'), 'Flag': ('Right', 'Click')}
-        win_terface.execute_mouse(self.convert_cell_to_screen(*targetIndex))
-        win_terface.execute_mouse(actionDict[Action])
+    def open_cells(self, *indexCollection):
+        for Index in indexCollection:
+            X, Y = self.convert_cell_to_screen(*Index)
+            print(X, Y)
+            win_terface.execute_mouse(X, Y)
+            win_terface.execute_mouse(('Left', 'Click'))
+
+    def flag_cells(self, *indexCollection):
+        for Index in indexCollection:
+            win_terface.execute_mouse(self.convert_cell_to_screen(*Index))
+            win_terface.execute_mouse(('Right', 'Click'))
+            self[Index] = 'F'
+            self.unsolved.discard(Index)
+
 
     def convert_cell_to_screen(self, X, Y):
         """Converts the cell index to the expected screen X and Y."""
@@ -113,10 +116,16 @@ class MinesweeperInterface(OrderedDict):
         screenY = self.top + (self.tile_size * Y) + 8
         return screenX, screenY
 
-    def collect_adjacent(self, X, Y):
+    def collect_adjacent(self, Index):
+        X, Y = Index
         rangeX = [V for V in range(X - 1, X + 2) if -1 < V < self.width]
         rangeY = [V for V in range(Y - 1, Y + 2) if -1 < V < self.height]
         return [((X, Y), self[(X, Y)]) for Y in rangeY for X in rangeX]
+
+    def identify_discovered_cell(self):
+        targetIndex = choice(list(self.unsolved))
+        self.open_cells(targetIndex)
+        return self.identify_cell_value(*targetIndex)
 
     def __str__(self):
         args = [(str(V) for V in self.values())] * self.width
@@ -124,57 +133,101 @@ class MinesweeperInterface(OrderedDict):
 
 
 def main():
+    Start = time()
     Minefield = MinesweeperInterface()
     if 0 not in Minefield.values():
-        attain_suitable_start(Minefield)
+        Start = attain_suitable_start(Minefield)
         Minefield.read_field()
     while Minefield.unsolved:
-        apply_isolated_logic(Minefield)
-        Minefield.read_field()
-    print(Minefield)
+        Changed = apply_logic(Minefield)
+        if not Changed and Minefield.identify_discovered_cell() == 'M':
+            print("Forced to explore and hit a mine. Unlucky I guess.")
+            print(Minefield)
+            for Index in sorted(Minefield.unsolved):
+                print(Index, Minefield[Index])
+            exit()
+        else:
+            Minefield.read_field()
+    print('It took {:.2f}seconds to solve.'.format(time()-Start))
 
 
 def attain_suitable_start(Minefield):
-    cellValue, Reset = 1, 0
+    cellValue, Reset, Start = 1, 0, time()
     while cellValue:
-        targetIndex = choice(list(Minefield.keys()))
-        Minefield.preform_to_cell(targetIndex, 'Open')
-        cellValue = Minefield.identify_cell_value(*targetIndex)
-        if cellValue == 7:
+        cellValue = Minefield.identify_discovered_cell()
+        if cellValue == 'M':
             Reset += 1
             Minefield.reset()
-    else:
-        print('Reset {} time{}.'.format(Reset, '' if Reset == 1 else 's'))
+            Start = time()
+    print('Reset {} time{}.'.format(Reset, '' if Reset == 1 else 's'))
+    return Start
 
+
+def apply_logic(Minefield):
+    Previous = Minefield.unsolved.copy()
+    apply_isolated_logic(Minefield)
+    Changed = Previous != Minefield.unsolved
+    if not Changed:
+        apply_overlapping_logic(Minefield)
+        Minefield.read_field()
+        Changed = Previous != Minefield.unsolved
+    return Changed
 
 def apply_isolated_logic(Minefield):
-    for targetIndex in Minefield.unsolved.copy():
-        try:
-            lackingMines, Covered, coveredLst = comprehend_adjacent(
-                Minefield, targetIndex)
-        except TypeError:
-            continue
+    Unsolved = Minefield.unsolved.copy()
+    for targetSynopsis in comprehend_indexes(Unsolved, Minefield):
+        targetIndex, lackingMines, coveredLst = targetSynopsis
+        Covered = len(coveredLst)
 
         if not Covered:
             Minefield.unsolved.discard(targetIndex)
         elif not lackingMines:
-            for Index in coveredLst:
-                Minefield.preform_to_cell(Index, 'Open')
+            Minefield.open_cells(*coveredLst)
         elif lackingMines == Covered:
-            for Index in coveredLst:
-                Minefield.preform_to_cell(Index, 'Flag')
-                Minefield[Index] = 'F'
-                Minefield.unsolved.discard(Index)
+            Minefield.flag_cells(*coveredLst)
+
+def comprehend_indexes(indexCollection, Minefield):
+    for targetIndex in indexCollection:
+        requiredMines = Minefield[targetIndex]
+        Adjacent = Minefield.collect_adjacent(targetIndex)
+        flaggedMines = len([Val for _,  Val in Adjacent if Val == 'F'])
+        try:
+            lackingMines = requiredMines - flaggedMines
+        except TypeError:
+            pass
+        else:
+            coveredLst = [Index for Index, Val in Adjacent if Val == 'C']
+            yield targetIndex, lackingMines, coveredLst
 
 
-def comprehend_adjacent(Minefield, targetIndex):
-    Mines = Minefield[targetIndex]
-    Adjacent = Minefield.collect_adjacent(*targetIndex)
-    flaggedMines = len([Val for _,  Val in Adjacent if Val == 'F'])
-    lackingMines = Mines - flaggedMines
-    coveredLst = [Index for Index, Val in Adjacent if Val == 'C']
-    Covered = len(coveredLst)
-    return lackingMines, Covered, coveredLst
+def apply_overlapping_logic(Minefield):
+    """Deduce the non-overlapping cells of two targetCells."""
+    # Logic explained https://www.youtube.com/watch?v=R6C_TZHDXCw#t=224
+    for overlapSynopsis in comprehend_overlaps(Minefield):
+        primaryOnlyMines, primaryOnlyCoveredLst, secondaryTotallyShared = (
+            overlapSynopsis)
+        if not primaryOnlyMines and secondaryTotallyShared:
+            Minefield.open_cells(*primaryOnlyCoveredLst)
+        elif primaryOnlyMines == len(primaryOnlyCoveredLst):
+            Minefield.flag_cells(*primaryOnlyCoveredLst)
+
+
+def comprehend_overlaps(Minefield):
+    Unsolved = Minefield.unsolved.copy()
+    for primarySynopsis in comprehend_indexes(Unsolved, Minefield):
+        primaryIndex, primaryMines, primaryCoveredLst = primarySynopsis
+        indexAdjacent, _ = zip(*Minefield.collect_adjacent(primaryIndex))
+
+        for secondarySynopsis in comprehend_indexes(indexAdjacent, Minefield):
+            _, secondaryMines, secondaryCoveredLst = secondarySynopsis
+
+            sharedMines = min(primaryMines, secondaryMines)
+            primaryOnlyMines = primaryMines - sharedMines
+            primaryOnlyCovered = [Index for Index in primaryCoveredLst
+                                  if Index not in secondaryCoveredLst]
+            secondaryTotallyShared = all(Index in primaryCoveredLst
+                                         for Index in secondaryCoveredLst)
+            yield primaryOnlyMines, primaryOnlyCovered, secondaryTotallyShared
 
 
 main()
