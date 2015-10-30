@@ -26,10 +26,12 @@ Bot that plays a game of Minesweeper by reading the screen, making
 #   Make as simple as possible without losing functionality.
 #   Simple implementation is easier to build, fix and modify.
 
-import sys
 from collections import OrderedDict
+from functools import partial
 from random import choice
 from time import sleep, time
+import argparse
+import sys
 
 from PIL import Image, ImageGrab
 
@@ -54,7 +56,7 @@ class MinesweeperInterface(OrderedDict):
         (128, 128, 128, 0): 'C',  # Covered
         }
 
-    def __init__(self):
+    def __init__(self, **Options):
         OrderedDict.__init__(self)
         self.window = win_terface.WindowElement('Minesweeper')
         self.left, self.top, _, _ = self.window.position
@@ -65,6 +67,11 @@ class MinesweeperInterface(OrderedDict):
         Keys = [(X, Y) for Y in range(self.height) for X in range(self.width)]
         self.read_field(Keys)
         self.unsolved = set(Keys)
+        self.open_cells = partial(self.apply_function, self.click_open)
+        flagType = {True: self.click_flag, False: self.remember_flag}
+        self.flag_cells = partial(self.apply_function, flagType[Options['flag']])
+        self.pause = Options['pause']
+
 
     def read_field(self, Keys=None):
         assert 'M' not in self.values()
@@ -95,17 +102,23 @@ class MinesweeperInterface(OrderedDict):
     def reset(self):
         self.open_cells(self.reset_button)
 
-    def open_cells(self, *indexCollection):
-        for Index in indexCollection:
-            win_terface.execute_mouse(self.convert_cell_to_screen(*Index))
-            win_terface.execute_mouse(('Left', 'Click'))
+    def apply_function(self, Function, *toCells):
+        for Index in toCells:
+            sleep(self.pause)
+            Function(Index)
 
-    def flag_cells(self, *indexCollection):
-        for Index in indexCollection:
-            win_terface.execute_mouse(self.convert_cell_to_screen(*Index))
-            # win_terface.execute_mouse(('Right', 'Click'))
-            self[Index] = 'F'
-            self.unsolved.discard(Index)
+    def click_open(self, Index):
+        win_terface.execute_mouse(self.convert_cell_to_screen(*Index))
+        win_terface.execute_mouse(('Left', 'Click'))
+
+    def click_flag(self, Index):
+        win_terface.execute_mouse(self.convert_cell_to_screen(*Index))
+        win_terface.execute_mouse(('Right', 'Click'))
+        self.remember_flag(Index)
+
+    def remember_flag(self, Index):
+        self[Index] = 'F'
+        self.unsolved.discard(Index)
 
     def convert_cell_to_screen(self, X, Y):
         """Converts cell index to the expected screen X and Y."""
@@ -132,8 +145,26 @@ class MinesweeperInterface(OrderedDict):
 
 
 def main():
+    Speed = {'Fastest': 0, 'Faster': 1/8, 'Fast': 1/4, 'Normal': 1/2}
+    Parser = argparse.ArgumentParser()
+    Parser.add_argument('-f', '--flag', action="store_false")
+    Group = Parser.add_mutually_exclusive_group()
+    Group.add_argument('-s', '--speed', choices=Speed)
+    Group.add_argument('-p', '--pause', default=3/4, type=float)
+    Options = vars(Parser.parse_args())
+    pauseOverride = Speed.get(Options['speed'], None)
+    if pauseOverride is not None:
+        Options['pause'] = pauseOverride
+    elif not 0 <= Options['pause'] <= 2:
+        print(
+        "Custome pause time is unacceptable. Continuing with 3/4 seconds.")
+        Options['pause'] = 3/4
+    play_minesweeper(**Options)
+
+
+def play_minesweeper(**Options):
     Start = time()
-    Minefield = MinesweeperInterface()
+    Minefield = MinesweeperInterface(**Options)
     if 0 not in Minefield.values():
         Start = attain_suitable_start(Minefield)
         Minefield.read_field()
