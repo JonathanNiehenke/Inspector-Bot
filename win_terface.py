@@ -13,42 +13,83 @@ interact with Windows.
 from __future__ import print_function
 
 import win32gui
+import win32ui
 # import pywintypes
 from win32api import mouse_event, GetSystemMetrics
 
-SCREEN_RESOLUTION = GetSystemMetrics(0), GetSystemMetrics(1)
-ABSOLUTE_RATIO_X = 65535.0/SCREEN_RESOLUTION[0]
-ABSOLUTE_RATIO_Y = 65535.0/SCREEN_RESOLUTION[1]
+ABSOLUTE_RATIO_X = 65535.0/GetSystemMetrics(0)
+ABSOLUTE_RATIO_Y = 65535.0/GetSystemMetrics(1)
 
+class WindowElement(object):
+    
+    def __init__(self, windowName):
+        self.handle = identify_window(windowName)
+        self.bring_to_top()
+        windowDcHandle = win32gui.GetWindowDC(self.handle)
+        self.device_context = win32ui.CreateDCFromHandle(windowDcHandle)
+        self.position = win32gui.GetWindowRect(self.handle)
+        self.width, self.height = dimension_window(*self.position)
 
-def locate_window(windowName):
-    """Returns and reveals the window's position."""
-    windowID = identify_window(windowName)
-    win32gui.ShowWindow(windowID, 1)  # Restores if minimized.
-    win32gui.SetForegroundWindow(windowID)
-    return win32gui.GetWindowRect(windowID)
+    def bring_to_top(self):
+        win32gui.ShowWindow(self.handle, 1)  # Restores if minimized.
+        win32gui.SetForegroundWindow(self.handle)
+
+    def identify_pixel(self, X, Y, Capture=None):
+        """Returns the RGB tuple of Capture or window at X and Y."""
+        try:
+            intRGB = Capture.GetPixel(X, Y)
+        except AttributeError:
+            intRGB = self.device_context.GetPixel(X, Y)
+        return tuple((intRGB >> Val) & 255 for Val in (0, 8, 16))
+
+    def capture(self, fileName=None):
+        """Returns the window image and saves as fileName if given."""
+        compatibleDC = self.device_context.CreateCompatibleDC()
+        dataBitMap = win32ui.CreateBitmap()
+        dataBitMap.CreateCompatibleBitmap(
+            self.device_context, self.width, self.height)
+        compatibleDC.SelectObject(dataBitMap)
+        compatibleDC.BitBlt(
+            (0,0),
+            (self.width, self.height),
+            self.device_context,
+            (0,0),
+            13369376,  # win32con.SRCCOPY
+            )
+        try:
+            dataBitMap.SaveBitmapFile(compatibleDC, fileName)
+        except TypeError:
+            pass
+        return compatibleDC
+
+    def move_to(self, Left, Top):
+        """Moves the window to absolute Left and Top position."""
+        win32gui.MoveWindow(
+            self.handle, Left, Top, self.width, self.height, True)
+
+    def resize(self, Width, Height):
+        """Resizes window in-place to specified Width and Height."""
+        Top, Left, _, _ = self.position
+        win32gui.MoveWindow(self.handle, Left, Top, Width, Height, True)
 
 
 def identify_window(windowName):
     """Gets the window identifier by a window's title."""
     windowID = win32gui.FindWindow(None, windowName)
     if not windowID:
-        print('Window with entire title was not found.')
-        print('Now searching for the given title within a window title.')
         windowID = identify_window2(windowName)
     return windowID
-
 
 def identify_window2(windowName):
     """Gets the window identifier by a piece of a window's title."""
     callerReturn = []
 
-    def enum_caller(hwnd, wName):
-        if windowName in win32gui.GetWindowText(hwnd):
-            callerReturn.append(hwnd)
+    def enum_caller(windowID, wName):
+        if wName in win32gui.GetWindowText(windowID):
+            callerReturn.append(windowID)
             return True
 
-    win32gui.EnumWindows(enum_caller, wName)
+    win32gui.EnumWindows(enum_caller, windowName)
     try:
         windowID = callerReturn.pop()
     except IndexError:
@@ -75,16 +116,37 @@ def convert_to_absolute(screenX, screenY):
     return int(screenX*ABSOLUTE_RATIO_X), int(screenY*ABSOLUTE_RATIO_Y)
 
 
-def shift_window(windowID, newLocation, newSize):
-    """Moves and/or resizes the window."""
-    win32gui.ShowWindow(windowID, 1)  # Restores if minimized.
-    try:
-        Width, Height = newSize
-    except TypeError:
-        Left, Top, Right, Bot = locate_window(windowID)
-        Width, Height = Right - Left, Bot - Top
-    try:
-        Left, Top = newLocation
-    except TypeError:
-        Left, Top, _, _ = locate_window(windowID)
-    win32gui.MoveWindow(windowID, Left, Top, Width, Height, True)
+# def capture_window(windowID=None):
+    # """Takes a screenshot of the screen or application."""
+    # if windowID is None:
+        # windowID = win32gui.GetDesktopWindow()
+    # Width, Height = dimension_window(*win32gui.GetWindowRect(windowID))
+    # windowDC = win32gui.GetWindowDC(windowID)
+    # dcObj = win32ui.CreateDCFromHandle(windowDC)
+    # compatibleDC = dcObj.CreateCompatibleDC()
+    # dataBitMap = win32ui.CreateBitmap()
+    # dataBitMap.CreateCompatibleBitmap(dcObj, Width, Height)
+    # compatibleDC.SelectObject(dataBitMap)
+    # compatibleDC.BitBlt((0,0),(Width, Height) , dcObj, (0,0), win32con.SRCCOPY)
+    # return dataBitMap
+    # dataBitMap.SaveBitmapFile(compatibleDC, r'E:\Pictures\test.bmp')
+
+    # # Free Resources
+    # dcObj.DeleteDC()
+    # compatibleDC.DeleteDC()
+    # win32gui.ReleaseDC(windowID, windowDC)
+    # win32gui.DeleteObject(dataBitMap.GetHandle())
+
+
+
+
+
+def identify_window(windowName):
+    """Gets the window identifier by a window's title."""
+    windowID = win32gui.FindWindow(None, windowName)
+    if not windowID:
+        windowID = identify_window2(windowName)
+    return windowID
+
+def dimension_window(Left, Top, Right, Bottom):
+    return Right - Left, Bottom - Top
