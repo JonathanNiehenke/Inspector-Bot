@@ -63,29 +63,28 @@ class MinesweeperInterface(OrderedDict):
         self.height = (self.window.height - gridYPadding)//self.tile_size
         self.reset_button = (self.width/2, -2)
         Keys = [(X, Y) for Y in range(self.height) for X in range(self.width)]
-        self.unsolved = set(Keys)
         self.read_field(Keys)
+        self.unsolved = set(Keys)
 
     def read_field(self, Keys=None):
         assert 'M' not in self.values()
         if Keys is None:
             Keys = self.unsolved.copy()
-        fieldImage = self.window.capture()
+        self.window.update_capture()
             # r'E:\Pictures\Minesweeper\Read{:.2f}.bmp'.format(time()))
-        for X, Y in Keys.copy():
-            self[(X, Y)] = self.identify_cell_value(X, Y, fieldImage)
+        for Index in Keys.copy():
+            self[Index] = self.identify_cell_value(
+                    self.window.identify_capture_pixel, Index)
 
-    def identify_cell_value(self, X, Y, fieldImage=None):
-        windowX, windowY = self.convert_cell_to_window(X, Y)
-        macroColor = self.window.identify_pixel(
-            windowX + 14, windowY + 8, fieldImage)
+    def identify_cell_value(self, idPixelFunc, Index):
+        windowX, windowY = self.convert_cell_to_window(*Index)
+        macroColor = idPixelFunc(windowX + 14, windowY + 8)
         try:
-            Value = self.cipher[macroColor + (0,)]
+            cellValue = self.cipher[macroColor + (0,)]
         except KeyError:
-            valueColor = self.window.identify_pixel(
-                windowX + 7, windowY + 4, fieldImage)
-            Value = self.cipher[valueColor]
-        return Value
+            valueColor = idPixelFunc(windowX + 7, windowY + 4)
+            cellValue = self.cipher[valueColor]
+        return cellValue
 
     def convert_cell_to_window(self, X, Y):
         gridLeft, gridTop = 15, 101
@@ -122,8 +121,10 @@ class MinesweeperInterface(OrderedDict):
     def identify_discovered_cell(self):
         targetIndex = choice(list(self.unsolved))
         self.open_cells(targetIndex)
-        sleep(1/512)
-        return self.identify_cell_value(*targetIndex)
+        sleep(3/1024)
+        cellValue = self.identify_cell_value(
+            self.window.identify_current_pixel, targetIndex)
+        return cellValue
 
     def __str__(self):
         args = [(str(V) for V in self.values())] * self.width
