@@ -15,33 +15,22 @@ Bot that plays a game of Minesweeper by reading the screen, making
 #   continuous defined group of functions or defined elsewhere which
 #   would note a def@ comment.
 
-# Personal challenge: -- Why? For improvement.
-#   Clean clear code > performance benefits > type saving.
-#   Frequently, succinctly, and completely inform future code readers.
-#   The code should explain itself while comments explain application.
-#   Properly named functions and variables describe their purpose.
-#   Descriptive verb function names express action and imply output.
-#   Assertions disclose both your assumptions and variable conditions.
-#   Handling errors is easier, cheaper and clearer than error dodging.
-#   Make as simple as possible without losing functionality.
-#   Simple implementation is easier to build, fix and modify.
-
 from collections import OrderedDict
+from fractions import Fraction
 from functools import partial
 from random import choice
 from time import sleep, time
 import argparse
-import sys
 
-from PIL import Image, ImageGrab
-
-sys.path.append(r'F:\Source\ai_projects')
 import win_terface
 
 class MinesweeperInterface(OrderedDict):
+    """
+    An object to automate playing the Windows XP version of minesweeper.
+   """
 
-    tile_size = 16
-    cipher = {
+    left_minefield_margin, top_minefield_margin, cell_size = 15, 101, 16
+    color_decoder = {
         (192, 192, 192): 0,
         (0, 0, 255): 1,
         (0, 128, 0): 2,
@@ -51,215 +40,251 @@ class MinesweeperInterface(OrderedDict):
         (0, 128, 128): 6,
         (0, 0, 0): 7,
         (128, 128, 128): 8,
-        # (192, 192, 192, 0): 0,  # Empty
         (0, 0, 0, 0): 'M', # Mine
         (128, 128, 128, 0): 'C',  # Covered
         }
 
     def __init__(self, **Options):
         OrderedDict.__init__(self)
-        self.window = win_terface.WindowElement('Minesweeper')
-        self.left, self.top, _, _ = self.window.position
-        gridXPadding, gridYPadding = 26, 112
-        self.width = (self.window.width - gridXPadding)//self.tile_size
-        self.height = (self.window.height - gridYPadding)//self.tile_size
-        self.reset_button = (self.width/2, -2)
-        Keys = [(X, Y) for Y in range(self.height) for X in range(self.width)]
-        self.read_field(Keys)
-        self.unsolved = set(Keys)
-        self.open_cells = partial(self.apply_function, self.click_open)
-        flagType = {True: self.click_flag, False: self.remember_flag}
-        self.flag_cells = partial(self.apply_function, flagType[Options['flag']])
-        self.pause = Options['pause']
+        self.game_window = win_terface.WindowElement(
+            'Minesweeper', bringTop=True)
+        self.window_left, self.window_top, _, _ = self.game_window.position
+        minefieldWidth = (self.game_window.width - 26)
+        minefieldHeight = (self.game_window.height - 112)
+        self.width_by_cells = minefieldWidth // self.cell_size
+        self.height_by_cells = minefieldHeight // self.cell_size
+        self.reset_button_index = (self.width_by_cells/2, -2)
+        indexCollection = [(X, Y) for Y in range(self.height_by_cells)
+                           for X in range(self.width_by_cells)]
+        self.unsolved_cell_collection = set(indexCollection)
+        self.open_cells, self.flag_cells, self.save_dir = (
+            self.manage_options(Options))
+        self.read_minefield()
 
+    def manage_options(self, Options):
+        openCells = partial(
+            self.preform_to_cells, self.click_open, Options.get('pause', 0))
+        flaggingFunc = self.click_flag if Options['flag'] else self.mark_flag
+        flagCells = partial(
+            self.preform_to_cells, flaggingFunc, Options.get('pause', 0))
+        saveDir = Options.get('record', None)
+        return openCells, flagCells, saveDir
 
-    def read_field(self, Keys=None):
+    def read_minefield(self, indexCollection=None):
         assert 'M' not in self.values()
-        if Keys is None:
-            Keys = self.unsolved.copy()
-        self.window.update_capture()
-            # r'E:\Pictures\Minesweeper\Read{:.2f}.bmp'.format(time()))
-        for Index in Keys.copy():
-            self[Index] = self.identify_cell_value(
-                    self.window.identify_capture_pixel, Index)
-
-    def identify_cell_value(self, idPixelFunc, Index):
-        windowX, windowY = self.convert_cell_to_window(*Index)
-        macroColor = idPixelFunc(windowX + 14, windowY + 8)
+        if indexCollection is None:
+            indexCollection = self.unsolved_cell_collection.copy()
+        captureImage = self.game_window.screen_capture()
         try:
-            cellValue = self.cipher[macroColor + (0,)]
+            filePathname = ''.join([self.save_dir, '\\', str(time()), '.bmp'])
+        except TypeError:
+            pass
+        else:
+            captureImage.save(filePathname)
+        for cellIndex in indexCollection.copy():
+            self[cellIndex] = self.decipher_mineweeper_cell(
+                captureImage, cellIndex)
+
+    def decipher_mineweeper_cell(self, Object, cellIndex):
+        """Return the minesweeper value of cell at Index."""
+        windowX, windowY = self.convert_cell_index_to_window(*cellIndex)
+        macroColor = Object[windowX + 14, windowY + 8] + (0,)
+        try:
+            cellValue = self.color_decoder[macroColor]
         except KeyError:
-            valueColor = idPixelFunc(windowX + 7, windowY + 4)
-            cellValue = self.cipher[valueColor]
+            cellValue = self.color_decoder[Object[windowX + 7, windowY + 4]]
         return cellValue
 
-    def convert_cell_to_window(self, X, Y):
-        gridLeft, gridTop = 15, 101
-        windowX = gridLeft + (self.tile_size * X)
-        windowY = gridTop + (self.tile_size * Y)
-        return windowX, windowY
-
     def reset(self):
-        self.open_cells(self.reset_button)
+        """Preforms the mouse action to reset the minefield."""
+        self.open_cells(self.reset_button_index)
 
-    def apply_function(self, Function, *toCells):
-        for Index in toCells:
-            sleep(self.pause)
-            Function(Index)
+    def preform_to_cells(self, Function, Pause, *cellCollection):
+        for Index in cellCollection:
+            Function(Index, Pause)
 
-    def click_open(self, Index):
-        win_terface.execute_mouse(self.convert_cell_to_screen(*Index))
+    def click_open(self, Index, Pause):
+        """Preforms the mouse action to open the cell at index."""
+        win_terface.execute_mouse(self.convert_cell_index_to_screen(*Index))
+        sleep(Pause)
         win_terface.execute_mouse(('Left', 'Click'))
 
-    def click_flag(self, Index):
-        win_terface.execute_mouse(self.convert_cell_to_screen(*Index))
+    def click_flag(self, Index, Pause):
+        """Preforms the mouse action to flag the cell at index."""
+        win_terface.execute_mouse(self.convert_cell_index_to_screen(*Index))
+        sleep(Pause)
         win_terface.execute_mouse(('Right', 'Click'))
-        self.remember_flag(Index)
+        self.mark_flag(Index)
 
-    def remember_flag(self, Index):
+    def mark_flag(self, Index, *_):
         self[Index] = 'F'
-        self.unsolved.discard(Index)
+        self.unsolved_cell_collection.discard(Index)
 
-    def convert_cell_to_screen(self, X, Y):
-        """Converts cell index to the expected screen X and Y."""
-        (windowX, windowY), Center = self.convert_cell_to_window(X, Y), 8
-        return self.left + windowX + Center, self.top + windowY + Center
-
-    def collect_adjacent(self, Index):
+    def collect_adjacent_cells(self, Index):
+        """Return a list of surrounding cell indexes and values."""
         X, Y = Index
-        rangeX = [V for V in range(X - 1, X + 2) if -1 < V < self.width]
-        rangeY = [V for V in range(Y - 1, Y + 2) if -1 < V < self.height]
+        rangeX = [V for V in range(X - 1, X + 2)
+                  if -1 < V < self.width_by_cells]
+        rangeY = [V for V in range(Y - 1, Y + 2)
+                  if -1 < V < self.height_by_cells]
         return [((X, Y), self[(X, Y)]) for Y in rangeY for X in rangeX]
 
     def identify_discovered_cell(self):
-        targetIndex = choice(list(self.unsolved))
+        """Return the value of a randomly opened cell."""
+        targetIndex = choice(list(self.unsolved_cell_collection))
         self.open_cells(targetIndex)
-        sleep(3/1024)
-        cellValue = self.identify_cell_value(
-            self.window.identify_current_pixel, targetIndex)
+        sleep(3/1024)  # Otherwise the cell is read too fast.
+        cellValue = self.decipher_mineweeper_cell(self.game_window, targetIndex)
         return cellValue
 
+    def convert_cell_index_to_screen(self, X, Y):
+        """Converts cell index to the expected screen X and Y."""
+        Center = self.cell_size // 2
+        windowX, windowY = self.convert_cell_index_to_window(X, Y)
+        screenX = self.window_left + windowX + Center
+        screenY = self.window_top + windowY + Center
+        return screenX, screenY
+
+    def convert_cell_index_to_window(self, X, Y):
+        """Converts the X, Y of a cell to its X, Y in the window."""
+        windowX = self.left_minefield_margin + (self.cell_size * X)
+        windowY = self.top_minefield_margin + (self.cell_size * Y)
+        return windowX, windowY
+
     def __str__(self):
-        args = [(str(V) for V in self.values())] * self.width
+        args = [(str(V) for V in self.values())] * self.width_by_cells
         return '\n'.join(' '.join(Row) for Row in zip(*args))
 
 
 def main():
-    Speed = {'Fastest': 0, 'Faster': 1/8, 'Fast': 1/4, 'Normal': 1/2}
     Parser = argparse.ArgumentParser()
-    Parser.add_argument('-f', '--flag', action="store_false")
-    Group = Parser.add_mutually_exclusive_group()
-    Group.add_argument('-s', '--speed', choices=Speed)
-    Group.add_argument('-p', '--pause', default=3/4, type=float)
+    Parser.add_argument('-p', '--pause', default=0.0, type=pause_time,
+                        help="The pause time in seconds between actions.")
+    Parser.add_argument('-f', '--flag', action='store_true',
+                        help="Enables flagging mines otherwise leaves blank.")
+    Parser.add_argument('-r', '--record', '--record_into_directory',
+                        help="Directory to save the images the bot sees.")
+    Parser.add_argument('-d', '--display', '--display_end', action='store_true',
+                        help="Display the minefield before exiting.")
     Options = vars(Parser.parse_args())
-    pauseOverride = Speed.get(Options['speed'], None)
-    if pauseOverride is not None:
-        Options['pause'] = pauseOverride
-    elif not 0 <= Options['pause'] <= 2:
-        print(
-        "Custome pause time is unacceptable. Continuing with 3/4 seconds.")
-        Options['pause'] = 3/4
-    play_minesweeper(**Options)
+    play_minesweeper(Options)
 
 
-def play_minesweeper(**Options):
-    Start = time()
+def pause_time(Str):
+    Pause = float(Fraction(Str))
+    if not 0.0 <= Pause <= 5.0:
+        raise argparse.ArgumentTypeError(
+            'Value has to include or be within 0 and 5.')
+    return Pause 
+
+
+def play_minesweeper(Options):
     Minefield = MinesweeperInterface(**Options)
     if 0 not in Minefield.values():
-        Start = attain_suitable_start(Minefield)
-        Minefield.read_field()
-    while Minefield.unsolved:
+        attain_suitable_start(Minefield)
+        Minefield.read_minefield()
+    while Minefield.unsolved_cell_collection:
         Changed = apply_logic(Minefield)
         if not Changed and Minefield.identify_discovered_cell() == 'M':
             print("Forced to explore and hit a mine. Unlucky I guess.")
-            print(Minefield)
+            if Options.get('display-end'):
+                print(Minefield)
             exit()
         else:
-            Minefield.read_field()
-    print('It took {:.2f}seconds to solve.'.format(time()-Start))
+            Minefield.read_minefield()
+    if Options.get('display'):
+        print(Minefield)
 
 
 def attain_suitable_start(Minefield):
-    cellValue, Reset, Start = 1, 0, time()
+    """Explores and resets till a blank cell is uncovered."""
+    cellValue, Reset = 1, 0
     while cellValue:
         cellValue = Minefield.identify_discovered_cell()
         if cellValue == 'M':
             Reset += 1
             Minefield.reset()
-            sleep(1/4)
-            Start = time()
-    print('Reset {} time{}.'.format(Reset, '' if Reset == 1 else 's'))
-    return Start
+            sleep(1/64)
+    Msg = 'Reset {} time{} before a suitable start was found.'
+    print(Msg.format(Reset, '' if Reset == 1 else 's'))
 
 
 def apply_logic(Minefield):
-    Previous = Minefield.unsolved.copy()
+    """Deduce, flag, and open cells in Minefield."""
+    Previous = Minefield.unsolved_cell_collection.copy()
     apply_isolated_logic(Minefield)
-    # Minefield.read_field()
-    Changed = Previous != Minefield.unsolved
+    Changed = Previous != Minefield.unsolved_cell_collection
     if not Changed:
         apply_overlapping_logic(Minefield)
-        Minefield.read_field()
-        Changed = Previous != Minefield.unsolved
+        Minefield.read_minefield()
+        Changed = Previous != Minefield.unsolved_cell_collection
     return Changed
 
+
 def apply_isolated_logic(Minefield):
-    Unsolved = Minefield.unsolved.copy()
-    for targetIndex, targetSynopsis in comprehend_indexes(Unsolved, Minefield):
-        lackingMines, coveredLst = targetSynopsis
+    """Deduce, flag and open around individual cells."""
+    Unsolved = Minefield.unsolved_cell_collection.copy()
+    for targetInfo in condense_about_indexes(Minefield, Unsolved):
+        targetIndex, lackingMines, coveredLst = targetInfo
         Covered = len(coveredLst)
         if not Covered:
-            Minefield.unsolved.discard(targetIndex)
+            Minefield.unsolved_cell_collection.discard(targetIndex)
         elif not lackingMines:
             Minefield.open_cells(*coveredLst)
         elif lackingMines == Covered:
             Minefield.flag_cells(*coveredLst)
 
-def comprehend_indexes(indexCollection, Minefield):
+
+def condense_about_indexes(Minefield, indexCollection):
+    """Return the meaningful info about Indexes in indexCollection."""
     for targetIndex in indexCollection:
         requiredMines = Minefield[targetIndex]
-        Adjacent = Minefield.collect_adjacent(targetIndex)
-        flaggedMines = len([Val for _,  Val in Adjacent if Val == 'F'])
+        adjacentCells = Minefield.collect_adjacent_cells(targetIndex)
+        flaggedMines = len([Val for _,  Val in adjacentCells if Val == 'F'])
         try:
             lackingMines = requiredMines - flaggedMines
-        except TypeError:
+        except TypeError:  # requiredMines = 'F' or 'C'
             pass
         else:
-            coveredLst = [Index for Index, Val in Adjacent if Val == 'C']
-            yield targetIndex, (lackingMines, coveredLst)
+            coveredLst = [Index for Index, Val in adjacentCells if Val == 'C']
+            yield targetIndex, lackingMines, coveredLst
 
 
 def apply_overlapping_logic(Minefield):
-    """Deduce the non-overlapping cells of two targetCells."""
-    # Logic explained https://www.youtube.com/watch?v=R6C_TZHDXCw#t=224
-    for overlapSynopsis in comprehend_overlaps(Minefield):
-        primaryOnlyMines, primaryOnlyCoveredLst, secondaryTotallyShared = (
-            overlapSynopsis)
+    """Deduce, flag and open the non-overlapping cells of two cells."""
+    # https://www.youtube.com/watch?v=R6C_TZHDXCw#t=224 explains logic.
+    Unsolved = Minefield.unsolved_cell_collection.copy()
+    for overlappingOutline in condense_overlaps(Minefield, Unsolved):
+        primaryOnlyMines, primaryOnlyCovered, secondaryTotallyShared = (
+            overlappingOutline)
         if not primaryOnlyMines and secondaryTotallyShared:
-            Minefield.open_cells(*primaryOnlyCoveredLst)
-        elif primaryOnlyMines == len(primaryOnlyCoveredLst):
-            Minefield.flag_cells(*primaryOnlyCoveredLst)
+            Minefield.open_cells(*primaryOnlyCovered)
+        elif primaryOnlyMines == len(primaryOnlyCovered):
+            Minefield.flag_cells(*primaryOnlyCovered)
 
 
-def comprehend_overlaps(Minefield):
-    Unsolved = Minefield.unsolved.copy()
-    for primaryInfo in comprehend_indexes(Unsolved, Minefield):
-        primaryIndex, primarySynopsis = primaryInfo
-        indexAdjacent, _ = zip(*Minefield.collect_adjacent(primaryIndex))
-        for secondaryInfo in comprehend_indexes(indexAdjacent, Minefield):
-            _, secondarySynopsis = secondaryInfo
-            yield analyze_synopses(primarySynopsis, secondarySynopsis)
+def condense_overlaps(Minefield, Unsolved):
+    """Return the meaningful info about two overlapping cells."""
+    for primaryInfo in condense_about_indexes(Minefield, Unsolved):
+        primaryIndex, *primaryOutline = primaryInfo
+        adjacentCells = Minefield.collect_adjacent_cells(primaryIndex)
+        adjacentIndexes, _ = zip(*adjacentCells)
+        for secondaryInfo in condense_about_indexes(Minefield, adjacentIndexes):
+            _, *secondaryOutline = secondaryInfo
+            yield condense_overlapping_outines(primaryOutline, secondaryOutline)
 
-def analyze_synopses(primarySynopsis, secondarySynopsis):
-    primaryMines, primaryCoveredLst = primarySynopsis
-    secondaryMines, secondaryCoveredLst = secondarySynopsis
+
+def condense_overlapping_outines(primaryOutline, secondaryOutline):
+    """Return the meaningful info from overlapping Outlines."""
+    primaryMines, primaryCoveredLst = primaryOutline
+    secondaryMines, secondaryCoveredLst = secondaryOutline
     sharedMines = min(primaryMines, secondaryMines)
     primaryOnlyMines = primaryMines - sharedMines
-    primaryOnlyCovered = [Index for Index in primaryCoveredLst
-                          if Index not in secondaryCoveredLst]
-    secondaryTotallyShared = all(Index in primaryCoveredLst
-                                 for Index in secondaryCoveredLst)
+    primarySet, secondarySet = set(primaryCoveredLst) , set(secondaryCoveredLst)
+    primaryOnlyCovered = primarySet.difference(secondarySet)
+    secondaryTotallyShared = secondarySet.issubset(primarySet)
     return primaryOnlyMines, primaryOnlyCovered, secondaryTotallyShared
 
 
-main()
+if __name__ == '__main__':
+    main()

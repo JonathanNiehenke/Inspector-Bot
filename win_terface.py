@@ -1,26 +1,36 @@
 """
-    My personal function wrappers to logically and informatively
-interact with Windows.
+    My personal wrappers to quickly, logically and informatively manage
+the windows, screen captures and mouse actions of Microsoft Windows.
 """
-# Would like to move completely to built-in ctypes.
-# Memory severs FindWindows is difficult from ctypes.
+# Began: When I decided autopy and PIL.ImageGrab were not acceptable.
+# By Jonathan Niehenke
 
 # Naming Styles -- Why? For variable and function distinction.
 # Variables = mixedCamelCase, Global variable = ALL_CAPS;
 # Function/Methods/Modules = lowercase_with_underscores.
 # Class = CamelCase
 
+# Would like to handle garbage collection of device_context, context
+#   and bitmap myself, because it is missed by the garbage collector;
+#   but I don't have a clue.
+
+# Would like to move completely to built-in ctypes rather than depend
+#   on third party pywin32. Also ctypes supports SendInput.
+# If memory serves FindWindows is difficult from ctypes because python
+#   object need to be converted to acceptable ctype objects.
+
 from collections import namedtuple
 
+from win32api import mouse_event, GetSystemMetrics
 import win32gui
 import win32ui
-# import pywintypes
-from win32api import mouse_event, GetSystemMetrics
+
+Pixel = namedtuple('Pixel', ('red', 'green', 'blue'))
+Dimensions = namedtuple('Dimensions', ['width', 'height'])
 
 ABSOLUTE_RATIO_X = 65535.0/GetSystemMetrics(0)
 ABSOLUTE_RATIO_Y = 65535.0/GetSystemMetrics(1)
-Pixel = namedtuple('Pixel', ('Red', 'Green', 'Blue'))
-Dimensions = namedtuple('Dimensions', ['width', 'height'])
+
 VirtualKey = {
     8: 'Backspace', 9: 'Tab', 27: 'Esc', 32: 'Spacebar',
     33: 'Page Up', 34: 'Page Down', 35: 'End', 36: 'Home',
@@ -35,6 +45,9 @@ VirtualKey = {
     }
 
 class WindowElement(object):
+    """
+    Returns an object to manage and screen capture a window.
+    """
  
     def __init__(self, windowName=None, bringTop=False):
         self.handle = identify_window(windowName)
@@ -51,26 +64,11 @@ class WindowElement(object):
         win32gui.ShowWindow(self.handle, 1)  # Restores if minimized.
         win32gui.SetForegroundWindow(self.handle)
 
-    def update_capture(self, fileName=None):
-        """Returns the window capture and saves as fileName if given."""
-        self.capture_image.update_from_dc(self.device_context, self.width, self.height)
-        try:
-            self.capture_image.save(fileName)
-        except TypeError:
-            pass
+    def screen_capture(self):
+        """Refresh and returns the window capture."""
+        self.capture_image.update_from_dc(
+            self.device_context, self.width, self.height)
         return self.capture_image
-
-    def identify_current_pixel(self, X, Y):
-        """Returns the window's pixel value at Index as a RGB tuple."""
-        try:
-            intRGB = self.device_context.GetPixel(X, Y)
-        except win32ui.error:
-            raise IndexError
-        return convert_integer_rgb(intRGB)
-
-    def identify_capture_pixel(self, X, Y):
-        """Returns the capture pixel value at Index as a RGB tuple."""
-        return self.capture_image[(X, Y)]
 
     def move_to(self, Left, Top):
         """Moves the window to absolute Left and Top position."""
@@ -82,18 +80,30 @@ class WindowElement(object):
         Top, Left, _, _ = self.position
         win32gui.MoveWindow(self.handle, Left, Top, Width, Height, True)
 
+    def __getitem__(self, indexPair):
+        """Returns the RGB tuple of the window's pixel at indexPair."""
+        try:
+            intRGB = self.device_context.GetPixel(*indexPair)
+        except win32ui.error:
+            raise IndexError
+        return convert_integer_rgb(intRGB)
+
     def __repr__(self):
         windowName = win32gui.GetWindowText(self.handle)
         return '{}({})'.format(self.__class__.__name__, repr(windowName))
 
 
 class CaptureImage(object):
+    """
+    Returns object to retain, manage and preform screen captures.
+    """
 
     def __init__(self, Type, *args):
         self.bitmap = win32ui.CreateBitmap()
         {'Window': self.extract_window, 'DC': self.build_from_dc}[Type](*args)
 
     def extract_window(self, windowName):
+        """Initiate from a windowName."""
         Handle = identify_window(windowName)
         Width, Height= dimension_window(*win32gui.GetWindowRect(Handle))
         dcHandle = win32gui.GetWindowDC(Handle)
@@ -101,29 +111,37 @@ class CaptureImage(object):
         self.build_from_dc(DC, Width, Height)
 
     def build_from_dc(self, DC, Width, Height):
+        """Initiate from a device context of a window."""
+        self.dimensions = Dimensions(Width, Height)
         self.connect_dc(DC, Width, Height)
         self.update_from_dc(DC, Width, Height)
-        self.dimensions = Width, Height
 
     def connect_dc(self, DC, Width, Height):
+        """Creates and joins a context to a bitmap."""
         self.context = DC.CreateCompatibleDC()
         self.bitmap.CreateCompatibleBitmap(DC, Width, Height)
         self.context.SelectObject(self.bitmap)
 
     def update_from_dc(self, DC, Width, Height):
+        """Copy device context to bitmap context."""
         self.context.BitBlt((0,0), (Width, Height), DC, (0,0), 13369376)
 
     @property
     def raw_data(self):
+        """Return tuple of chained cycling of BGRX values."""
         return self.bitmap.GetBitmapBits()
 
-    def save(self, fileName):
-        self.bitmap.SaveBitmapFile(self.context, fileName)
-        
-    def __getitem__(self, tupleIndex):
-        """Returns the pixel value at tupleIndex as a RGB tuple."""
+    def save(self, filePathname):
         try:
-            intRGB = self.context.GetPixel(*tupleIndex)
+            self.bitmap.SaveBitmapFile(self.context, filePathname)
+        except win32ui.error:
+            errorMsg = 'No such file or directory: {}'
+            raise FileNotFoundError(errorMsg.format(filePathname))
+        
+    def __getitem__(self, indexPair):
+        """Returns the RGB of the bitmap's pixel at indexPair."""
+        try:
+            intRGB = self.context.GetPixel(*indexPair)
         except win32ui.error:
             raise IndexError
         return convert_integer_rgb(intRGB)
@@ -165,10 +183,12 @@ def distinguish_window(windowName):
 
 
 def dimension_window(Left, Top, Right, Bottom):
+    """Return width and height from window rect."""
     return Right - Left, Bottom - Top
 
 
 def convert_integer_rgb(intRGB):
+    """Return RGB tuple from integer RGB."""
     return Pixel(*((intRGB >> Val) & 255 for Val in (0, 8, 16)))
 
 
@@ -210,6 +230,3 @@ def convert_to_absolute(screenX, screenY):
     # compatibleDC.DeleteDC()
     # win32gui.ReleaseDC(windowID, windowDC)
     # win32gui.DeleteObject(dataBitMap.GetHandle())
-
-
-
