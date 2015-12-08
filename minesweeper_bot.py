@@ -55,9 +55,10 @@ class MinesweeperInterface(OrderedDict):
         self.reset_button_index = (self.width_by_cells/2, -2)
         self.open_cells, self.flag_cells, self.save_dir = (
             self.manage_options(Options))
-        self.unsolved_cell_collection = set(
-            product(range(self.width_by_cells), range(self.height_by_cells)))
-        self.read_minefield()
+        indexCollection = [(X, Y) for Y in range(self.height_by_cells)
+                           for X in range(self.width_by_cells)]
+        self.unsolved_cell_collection = set(indexCollection)
+        self.read_minefield(indexCollection)
 
     def dimension_window(self):
         minefieldWidth = (self.game_window.width - 26)
@@ -79,9 +80,10 @@ class MinesweeperInterface(OrderedDict):
         saveDir = Options.get('record')
         return openCells, flagCells, saveDir
 
-    def read_minefield(self):
+    def read_minefield(self, indexCollection=None):
+        if indexCollection is None:
+            indexCollection = self.unsolved_cell_collection
         captureImage = self.capture_window_image()
-        indexCollection = self.unsolved_cell_collection.copy()
         for cellIndex in indexCollection:
             self[cellIndex] = self.decipher_mineweeper_cell(
                 captureImage, cellIndex)
@@ -116,28 +118,33 @@ class MinesweeperInterface(OrderedDict):
     def click_open(self, Index, Pause):
         """Preforms the mouse action to open the cell at index."""
         win_terface.execute_mouse(self.convert_cell_index_to_screen(*Index))
-        sleep(Pause)
         win_terface.execute_mouse(('Left', 'Click'))
+        sleep(Pause)
 
     def click_flag(self, Index, Pause):
         """Preforms the mouse action to flag the cell at index."""
         win_terface.execute_mouse(self.convert_cell_index_to_screen(*Index))
-        sleep(Pause)
         win_terface.execute_mouse(('Right', 'Click'))
         self.mark_flag(Index)
+        sleep(Pause)
 
     def mark_flag(self, Index, *_):
         self[Index] = 'F'
         self.unsolved_cell_collection.discard(Index)
 
-    def collect_adjacent_cells(self, Index):
+    def collect_adjacent_cells(self, Index, Width, Height):
         """Return a list of surrounding cell indexes and values."""
         X, Y = Index
-        rangeX = [V for V in range(X - 1, X + 2)
-                  if -1 < V < self.width_by_cells]
-        rangeY = [V for V in range(Y - 1, Y + 2)
-                  if -1 < V < self.height_by_cells]
-        return [((X, Y), self[(X, Y)]) for Y in rangeY for X in rangeX]
+        rangeX = [V for V in range(X - 1, X + 2) if -1 < V < Width]
+        rangeY = [V for V in range(Y - 1, Y + 2) if -1 < V < Height]
+        return [((X, Y), self[(X, Y)]) for X, Y in product(rangeX, rangeY)]
+
+    def collect_extended_cells(self, Index, Width, Height):
+        """Return a group of surrounding cell indexes and values."""
+        X, Y = Index
+        rangeX = [V for V in range(X - 2, X + 3) if -1 < V < Width]
+        rangeY = [V for V in range(Y - 2, Y + 3) if -1 < V < Height]
+        return (((X, Y), self[(X, Y)]) for X, Y in product(rangeX, rangeY))
 
     def identify_discovered_cell(self):
         """Return the value of a randomly opened cell."""
@@ -162,8 +169,8 @@ class MinesweeperInterface(OrderedDict):
         return windowX, windowY
 
     def __str__(self):
-        args = [(str(V) for V in self.values())] * self.width_by_cells
-        return '\n'.join(' '.join(Row) for Row in zip(*args))
+        Rows = zip(*[map(str, self.values())] * self.width_by_cells)
+        return '\n'.join(' '.join(Row) for Row in Rows)
 
 
 def main():
@@ -242,9 +249,11 @@ def apply_isolated_logic(Minefield):
 
 def condense_about_indexes(Minefield, indexCollection):
     """Return the meaningful info about Indexes in indexCollection."""
+    Width, Height = (Minefield.width_by_cells, Minefield.height_by_cells)
     for targetIndex in indexCollection:
         requiredMines = Minefield[targetIndex]
-        adjacentCells = Minefield.collect_adjacent_cells(targetIndex)
+        adjacentCells = Minefield.collect_adjacent_cells(
+            targetIndex, Width, Height)
         flaggedMines = len([Val for _,  Val in adjacentCells if Val == 'F'])
         try:
             lackingMines = requiredMines - flaggedMines
@@ -278,9 +287,10 @@ def deduce_exclusive_cell(Minefield, targetInfo):
 
 
 def condense_overlaps(Minefield, targetIndex, *targetOutline):
-    adjacentCells = Minefield.collect_adjacent_cells(targetIndex)
-    adjacentIndexes, _ = zip(*adjacentCells)
-    for _, *helperOutline in condense_about_indexes(Minefield, adjacentIndexes):
+    Dimensions = (Minefield.width_by_cells, Minefield.height_by_cells)
+    extendedCells = Minefield.collect_extended_cells(targetIndex, *Dimensions)
+    extendedIndexes, _ = zip(*extendedCells)
+    for _, *helperOutline in condense_about_indexes(Minefield, extendedIndexes):
         overlappingOutline = condense_overlapping_outines(
             targetOutline, helperOutline)
         targetExclusiveCovered = overlappingOutline[1]
