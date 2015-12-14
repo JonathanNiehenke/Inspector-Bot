@@ -5,11 +5,6 @@ the windows, screen captures and mouse actions of Microsoft Windows.
 # Began: When I decided autopy and PIL.ImageGrab were not acceptable.
 # By Jonathan Niehenke
 
-# Naming Styles -- Why? For variable and function distinction.
-# Variables = mixedCamelCase, Global variable = ALL_CAPS;
-# Function/Methods/Modules = lowercase_with_underscores.
-# Class = CamelCase
-
 # Would like to handle garbage collection of device_context, context
 #   and bitmap myself, because it is missed by the garbage collector;
 #   but I don't have a clue.
@@ -20,18 +15,40 @@ the windows, screen captures and mouse actions of Microsoft Windows.
 #   object need to be converted to acceptable ctype objects.
 
 from collections import namedtuple
+from functools import partial
+import ctypes
 
 from win32api import mouse_event, GetSystemMetrics
 import win32gui
 import win32ui
 
-Pixel = namedtuple('Pixel', ('red', 'green', 'blue'))
-Dimensions = namedtuple('Dimensions', ['width', 'height'])
+WIN32 = ctypes.windll.kernel32
+
+PIXEL = namedtuple('Pixel', ('red', 'green', 'blue'))
+DIMENSIONS = namedtuple('Dimensions', ['width', 'height'])
 
 ABSOLUTE_RATIO_X = 65535.0/GetSystemMetrics(0)
 ABSOLUTE_RATIO_Y = 65535.0/GetSystemMetrics(1)
 
-VirtualKey = {
+CONSOLE_COLOR = {
+    'Black': 0, 'Blue': 1, 'Green': 2, 'Aqua': 3, 'Red': 4, 'Purple': 5,
+    'Yellow': 6, 'White': 7, 'Gray': 8, 'Light blue': 9, 'Light green': 10,
+    'Light aqua': 11, 'Light red': 12, 'Light purple': 13,
+    'Light yellow': 14, 'Bright white': 15,
+    }
+
+PRINT_COLORS = [
+    {'fgColor': 'Bright white', 'bgColor': 'Light blue'},
+    {'fgColor': 'Bright white', 'bgColor': 'Red'},
+    {'fgColor': 'Light yellow', 'bgColor': 'Purple'},
+    {'fgColor': 'Light yellow', 'bgColor': 'Aqua'},
+    {'fgColor': 'Black', 'bgColor': 'Aqua'},
+    {'fgColor': 'Light green', 'bgColor': 'Black'},
+    ]
+
+
+
+VIRTUAL_KEY = {
     8: 'Backspace', 9: 'Tab', 27: 'Esc', 32: 'Spacebar',
     33: 'Page Up', 34: 'Page Down', 35: 'End', 36: 'Home',
     37: 'LArrow', 38: 'UArrow', 39: 'RArrow', 40: 'DArrow',
@@ -112,7 +129,7 @@ class CaptureImage(object):
 
     def build_from_dc(self, DC, Width, Height):
         """Initiate from a device context of a window."""
-        self.dimensions = Dimensions(Width, Height)
+        self.dimensions = DIMENSIONS(Width, Height)
         self.connect_dc(DC, Width, Height)
         self.update_from_dc(DC, Width, Height)
 
@@ -148,7 +165,7 @@ class CaptureImage(object):
 
     def __iter__(self):
         bgrxColors = [iter(self.bitmap.GetBitmapBits())] * 4
-        rgbColors = (Pixel(R, G, B) for B, G, R, _ in zip(*bgrxColors))
+        rgbColors = (PIXEL(R, G, B) for B, G, R, _ in zip(*bgrxColors))
         Rows = [rgbColors] * self.dimensions.width
         return zip(*Rows)
 
@@ -189,7 +206,7 @@ def dimension_window(Left, Top, Right, Bottom):
 
 def convert_integer_rgb(intRGB):
     """Return RGB tuple from integer RGB."""
-    return Pixel(*((intRGB >> Val) & 255 for Val in (0, 8, 16)))
+    return PIXEL(*((intRGB >> Val) & 255 for Val in (0, 8, 16)))
 
 
 def execute_mouse(*actionPairs):
@@ -210,6 +227,46 @@ def convert_to_absolute(screenX, screenY):
     return int(screenX*ABSOLUTE_RATIO_X), int(screenY*ABSOLUTE_RATIO_Y)
 
 
+def color_printer(consoleHandle, *printArgs, **kwArgs):
+    fgId = CONSOLE_COLOR.get(kwArgs.pop('fgColor'), 7)
+    bgId = CONSOLE_COLOR.get(kwArgs.pop('bgColor'), 0)
+    WIN32.SetConsoleTextAttribute(consoleHandle, fgId + bgId * 16)
+    print(*printArgs, **kwArgs, flush=True)
+
+
+print_color = partial(color_printer, WIN32.GetStdHandle(-11))
+
+
+def print_colorized_board(Board, *Args, **kwArgs):
+    for Row in assemble_colorized_board(Board, *Args, **kwArgs):
+        for boardValue, Color, End in Row:
+            print_color(boardValue, **Color, end=End)
+
+
+def assemble_colorized_board(Board, *Args, **kwArgs):
+    Colors = kwArgs.pop('Colors', PRINT_COLORS.copy())
+    assert len(Args) == len(Colors) - 2
+    otherColors = Colors[-2:]
+    argumentColors = list(zip(Args, Colors))
+    coloredBoard = []
+    for Y,  Row in enumerate(Board):
+        coloredBoard.append(colorize_row(Row, argumentColors, otherColors, Y))
+    return coloredBoard
+
+
+def colorize_row(Row, argumentColors, otherColors, Y):
+    defaultColor, originalColor = otherColors
+    for boardIndex, boardValue in Row:
+        for argValue, Color in argumentColors:
+            if boardIndex in argValue:
+                yield boardValue, Color, ' '
+                break
+        else:
+            yield boardValue, defaultColor, ' '
+    yield Y, originalColor, '\n'
+
+
+# Future Reference: Resource Handling
 # def capture_window(windowID=None):
     # """Takes a screenshot of the screen or application."""
     # if windowID is None:

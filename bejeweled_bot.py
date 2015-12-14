@@ -1,23 +1,22 @@
-'''
+"""
 Bot that plays Bejeweled by reading the screen, moving the mouse and
 making decisions usually favoring special gem creation.
-'''
+"""
 # Began 11/13/15
 # By Jonathan Niehenke
-
-# Naming Styles -- Why? For variable and function distinction.
-#   Variables = mixedCamelCase, Global variable = ALL_CAPS,
-#   Function/Methods/Modules = lowercase_with_underscores,
-#   Class = CamelCase
 
 # Definition Order -- Why? Improve reading navigation.
 #   In order of use (hierarchical top to bottom). Unless shared by a
 #   continuous defined group of functions or defined elsewhere which
 #   would note a  #def@ comment.
 
-from collections import OrderedDict
+from collections import namedtuple, OrderedDict
 from itertools import chain, product
 from random import choice
+
+import win_terface
+
+db=print
 
 
 class BejeweledField(OrderedDict):
@@ -31,28 +30,42 @@ class BejeweledField(OrderedDict):
             self.collapse_gems(X, Y)
 
     def collapse_gems(self, X, Y):
-        Indexes, Gems = zip(*
-            [(Index, self[Index]) for Index in self.collect_above(X, Y)])
-        print('Drop: {}'.format(Gems[0]))
+        gather_above = ((X, Y) for Y in range(Y, -1, -1))
+        Indexes, Gems = zip(*[(Index, self[Index]) for Index in gather_above])
         Gems = Gems[1:] + (' ',)
         for Index, Gem in zip(Indexes, Gems):
             self[Index] = Gem
 
-    def collect_above(self, X, Y):
-        while Y >= 0:
-            yield (X, Y)
-            Y -= 1
+    def collect_moves(self, Formations):
+        """Returns list of moves that join Formations."""
+        fieldDims = self.width_by_gem, self.height_by_gem
+        foundMoves = []
+        for Formation in Formations:
+            foundMoves.extend(self.collect_connections(*Formation, *fieldDims))
+        return sorted(foundMoves)
+
+    def collect_connections(self, Pattern, Link, Width, Height):
+        X, Y, Color = Link
+        whereToLook = ((Y - 1, X), (Y, X - 1), (Y, X + 1), (Y + 1, X))
+        fieldEdge = [(-1, X), (Y, -1), (X, Height), (Width, Y)]
+        whereNotToLook = Formation + fieldEdge
+        lookHere = (Index for Index in whereToLook
+                    if Index not in whereNotToLook)
+        foundConnecting = [(Pattern, Index, (X, Y)) for Index in lookHere
+                           if Field[Index] == Color]
+        return foundConnecting
 
     @property
     def rows(self):
-        return zip(*[iter(self.values())] * self.width_by_gem)
+        return zip(*[iter(self.items())] * self.width_by_gem)
 
     @property
     def columns(self):
         return zip(*self.rows)
 
     def __str__(self):
-        return '\n'.join(' '.join(Row) for Row in self.rows)
+        Rows = zip(*[iter(self.values())] * self.width_by_gem)
+        return '\n'.join(' '.join(Row) for Row in Rows)
 
 
 class BejeweledInterface(BejeweledField):
@@ -71,27 +84,25 @@ class BejeweledInterface(BejeweledField):
         pass
 
 
-def collect_formations(Board):
-    rowFormations, foundRowCombo = collect_row_formations(Board, Empty=1)
-    colFormations, foundColCombo = collect_column_formations(Board, Empty=1)
+def collect_something(Board):
+    rowFormations, foundRowCombo = collect_row_formations(Board)
+    colFormations, foundColCombo = collect_column_formations(Board)
     if foundRowCombo or foundColCombo:
-        print('Caught combo')
-        improvedCombos = collect_combos(rowFormations, colFormations)
-        comboPatterns = [Patterns for Patterns, _ in chain(*improvedCombos)]
-        print(comboPatterns)
-        Board.collapse_pattern(chain(*comboPatterns))
-        improvedRowFormations, improvedColFormations, starFormations = (
-            collect_formations(Board))
+        Combos =  collect_combos(rowFormations, colFormations)
+        print_patterns(Board, Combos) # db
+        comboPatterns = [Patterns for Patterns, _ in Combos]
+        Board.collapse_pattern(chain(*comboPatterns)) # db ???
+        Formations = collect_something(Board)
     else:
-        print('Missed combo')
-        improvedRowFormations = improve_collections(rowFormations)
-        improvedColFormations = improve_collections(colFormations)
-        starFormations = collect_star_formations(rowFormations, colFormations)
-    return improvedRowFormations, improvedColFormations, starFormations
+        Formations = collect_formations(rowFormations, colFormations)
+    return Formations
 
-def collect_row_formations(Board, Empty):
+
+def collect_row_formations(Board):
+    Width, Height = Board.width_by_gem, Board.height_by_gem
     Formations, foundCombo = [], False
-    for gemA, gemB, gemC, X, Y in gather_gem_trio(Board.rows, Empty):
+    for gemA, gemB, gemC, X, Y in gather_gem_trio(Board.rows):
+        assert 0 <= X < Width and 0 <= Y < Height, 'Incorrect board dimensions.'
         leftsidePair, rightsidePair = gemA == gemB, gemB == gemC
         if leftsidePair and rightsidePair:
             Formations.append(([(X - 2, Y), (X - 1, Y), (X, Y)], None))
@@ -105,28 +116,28 @@ def collect_row_formations(Board, Empty):
     return Formations, foundCombo
 
 
-def collect_column_formations(Board, Empty):
+def collect_column_formations(Board):
     Formations, foundCombo = [], False
-    for gemA, gemB, gemC, X, Y in gather_gem_trio(Board.columns, Empty):
+    for gemA, gemB, gemC, X, Y in gather_gem_trio(Board.columns):
         leftsidePair, rightsidePair = gemA == gemB, gemB == gemC
         if leftsidePair and rightsidePair:
-            Formations.append(([(Y, X - 2), (Y, X - 1), (Y, X)], None))
+            Formations.append(([(X, Y - 2), (X, Y - 1), (X, Y)], None))
             foundCombo = True
         elif leftsidePair :
-            Formations.append(([(Y, X - 2), (Y, X - 1)], (Y, X, gemA)))
+            Formations.append(([(X, Y - 2), (X, Y - 1)], (X, Y, gemA)))
         elif rightsidePair:
-            Formations.append(([(Y, X - 1), (Y, X)], (Y, X - 2, gemB)))
+            Formations.append(([(X, Y - 1), (X, Y)], (X, Y - 2, gemB)))
         elif gemA == gemC:
-            Formations.append(([(Y, X - 2), (Y, X)], (Y, X - 1, gemA)))
+            Formations.append(([(X, Y - 2), (X, Y)], (X, Y - 1, gemA)))
     return Formations, foundCombo
 
 
-def gather_gem_trio(boardVector, Empty=1):
-    for Y, Vector in enumerate(boardVector):
-        rowEnumerator = enumerate(Vector)
-        (_, gemA), (_, gemB) = next(rowEnumerator), next(rowEnumerator)
-        for X, gemC in rowEnumerator:
-            if (gemA, gemB, gemC).count(' ') <= Empty:
+def gather_gem_trio(boardVector):
+    for Vector in boardVector:
+        itVector = iter(Vector)
+        (_, gemA), (_, gemB) = next(itVector), next(itVector)
+        for (X, Y), gemC in itVector:
+            if (gemA, gemB, gemC).count(' ') <= 1:
                 yield gemA, gemB, gemC, X, Y
             gemA, gemB = gemB, gemC
 
@@ -134,89 +145,76 @@ def gather_gem_trio(boardVector, Empty=1):
 def collect_combos(rowFormations, colFormations):
     rowCombos = [(P, Link) for P, Link in rowFormations if Link is None]
     colCombos = [(P, Link) for P, Link in colFormations if Link is None]
-    improvedRowCombos = improve_collections(rowCombos)
-    improvedColCombos = improve_collections(colCombos)
-    # if rowCombos and colCombos:
-        # starCombos = collect_star_combos(rowCombos, colCombos)
-    # else:
-        # starCombos = []
-    return improvedRowCombos, improvedColCombos
+    Combos = collect_star(rowCombos, colCombos, Combo=True)
+    if not Combos:
+        Combos = improve_collections(rowCombos)
+        Combos.extend(improve_collections(colCombos))
+    return Combos
+
+
+def collect_formations(rowFormations, colFormations):
+    improvedRowFormations = improve_collections(rowFormations)
+    improvedColFormations = improve_collections(colFormations)
+    starFormations = collect_star(rowFormations, colFormations, Combo=False)
+    return improvedRowFormations, improvedColFormations, starFormations
 
 
 def improve_collections(basicFormations):
-    bogusValues = ([(-1, -1), (-1, -1)], (-1, -1, -1))
-    improvedFormations = [bogusValues]
+    improvedFormations = [([(-1, -1), (-1, -1)], (-1, -1, -1))]
     for Pattern, Link in basicFormations:
         previousPattern, previousLink = improvedFormations[-1]
-        patternsOverlap = previousPattern[-1] in Pattern
-        if Link == previousLink and patternsOverlap:
+        if Link == previousLink and previousPattern[-1] in Pattern:
             previousPattern.append(Pattern[-1])
         else:
-            # Copies to prevent modification to the basicFormations.
+            # Copies to prevent modification to basicFormations.
             improvedFormations.append((list(Pattern), Link))
     return improvedFormations[1:]
 
 
-def collect_star_combos(rowCombos, colCombos):
-    Intersections = collect_intersections(rowCombos, colCombos, Combo=True)
+def collect_star(rowFormations, colFormations, Combo):
+    Intersections = collect_intersections(rowFormations, colFormations, Combo)
     if Intersections:
-        crossingRowCombos = assemble_crossing_combos(rowCombos, Intersections)
-        crossingColCombos = assemble_crossing_combos(colCombos, Intersections)
-        starCombos = join_crossing_formations(
-            crossingRowCombos, crossingColCombos)
-    else:
-        starCombos = []
-    return starCombos
-
-
-def collect_star_formations(rowFormations, colFormations):
-    Intersections = collect_intersections(rowFormations, colFormations)
-    if Intersections:
-        crossingRowFormations = assemble_crossing_formations(
-            rowFormations, Intersections)
-        crossingColFormations = assemble_crossing_formations(
-            colFormations, Intersections)
-        starFormations = join_crossing_formations(
-            crossingRowFormations, crossingColFormations)
+        filter_crossing = (filter_crossing_combos if Combo
+                           else filter_crossing_formations)
+        crossingRowFilter =  filter_crossing(rowFormations, Intersections)
+        crossingColFilter =  filter_crossing(colFormations, Intersections)
+        starFormations = join_crossing(
+            crossingRowFilter, crossingColFilter, Combo)
     else:
         starFormations = []
     return starFormations
 
 
-def collect_intersections(rowFormations, colFormations, Combo=False):
-    twoVectors = rowFormations and colFormations
-    if twoVectors and Combo:
-        rowPatterns, _ = zip(*rowFormations)
-        columnPatterns, _ = zip(*colFormations)
-        Intersections = set(chain(*rowPatterns)) & set(chain(*columnPatterns))
-    elif twoVectors:
-        _, rowLinks = zip(*rowFormations)
-        _, columnLinks = zip(*colFormations)
-        Intersections = set(rowLinks) & set(columnLinks)
+def collect_intersections(rowFormations, colFormations, Combo):
+    if rowFormations and colFormations:
+        rowPatterns, rowLinks = zip(*rowFormations)
+        colPatterns, colLinks = zip(*colFormations)
+        if Combo:
+            Intersections = set(chain(*rowPatterns)) & set(chain(*colPatterns))
+        else:
+            Intersections = set(rowLinks) & set(colLinks)
     else:
         Intersections = set()
     return Intersections
 
-
-def assemble_crossing_combos(Combos, Intersections):
-    crossingCombos = []
+        
+def filter_crossing_combos(Combos, Intersections):
     for Pattern, _ in Combos:
         for Link in set(Pattern) & Intersections:
-            crossingCombos.append(Pattern, Link)
-    return crossingCombos
+            yield (Pattern, Link)
 
 
-def assemble_crossing_formations(Formations, Intersections):
-    crossingFormations = ((Pattern, Link) for Pattern, Link in Formations
-                          if Link in Intersections)
-    return crossingFormations
+def filter_crossing_formations(Formations, Intersections):
+    for Pattern, Link in Formations:
+        if Link in Intersections:
+            yield (Pattern, Link)
 
 
-def join_crossing_formations(crossingRowFormations, crossingColFormations):
+def join_crossing(crossingRowFormations, crossingColFormations, Combo):
     organizedRowFormations = organize_formation(crossingRowFormations)
     organizedColFormations = organize_formation(crossingColFormations)
-    crossingFormations = join_organized_formations(
-        organizedRowFormations, organizedColFormations)
+    crossingFormations = join_organized(
+        organizedRowFormations, organizedColFormations, Combo)
     return crossingFormations
 
 
@@ -227,25 +225,50 @@ def organize_formation(Formation):
     return Order
 
 
-def join_organized_formations(organizedRowFormations, organizedColFormations):
+def join_organized(organizedRowFormations, organizedColFormations, Combo):
+    if Combo:
+        remove_redundant_gem(organizedColFormations)
     crossingFormations = []
     for Link in organizedRowFormations:
-        patternPairs = product(
-            organizedRowFormations[Link], organizedColFormations[Link])
-        for rowPattern, colPattern in patternPairs:
-            crossingFormations.append((rowPattern + colPattern, Link))
+        patternPairs = product(organizedRowFormations[Link],
+                               organizedColFormations[Link])
+        crossingFormations.extend([(rowPattern + colPattern, Link)
+                                   for rowPattern, colPattern in patternPairs])
     return crossingFormations
 
 
+def remove_redundant_gem(organizedColCombo):
+    for Link, Patterns in organizedColCombo.items():
+        for Index, Pattern in enumerate(Patterns):
+            # Copies to prevent modification to basicFormations.
+            patternCopy = list(Pattern)
+            patternCopy.remove(Link)
+            Patterns[Index] = patternCopy
+
+
+def print_patterns(Field, Formations):
+    byPatternLen = OrderedDict(((5, set()), (4, set()), (3, set()), (2, set())))
+    for Pattern, _ in Formations:
+        byPatternLen[len(Pattern)].update(Pattern)
+    colorArgs = byPatternLen.values()
+    win_terface.print_colorized_board(Field.rows, *colorArgs, end=' ')
+    print()
+    
+
+def print_moves(Field, Formations):
+    colorArgs = [list(chain(*Group)) for Group in zip(Formations)]
+    win_terface.print_colorized_board(Field.rows, *colorArgs, end=' ')
+    
+
 def improved_field():
     Field = (
+        'YYBBBYYB', # Combo and Pair detection and handling.
+        'GGGRRGGG', # Combo and Pair detection and handling.
+        'POPOOOPO', # Combo and Split detection and handling.
+        'SYYYYYSY', # Combo and Split detection and handling.
         'BGGBGBGB', # Pair and Split detection and handling.
         'ORORORRO', # Pair and Split detection and handling.
         'PSSPSSPP', # Pair and Split detection and handling.
-        'YYBBBYYB', # Pair and Combo detection and handling.
-        'GGGRRGGG', # Combo and Pair detection and handling.
-        'POPOOOPO', # Combo and Split detection and handling.
-        'SYYYYYSY'  # Combo and Split detection and handling.
         )
     bjwdField = BejeweledField(
         (((X, Y), V) for Y, Row in enumerate(Field) for X, V in enumerate(Row)))
@@ -256,16 +279,32 @@ def star_field():
     Field = (
         'WBBWWGGW',
         'BWOOPPWG',
-        'YYWYYWPG',
+        'BOWYYWPG',
         'WOYWWBPW',
         'WRYWWBSW',
         'GRWBBWSO',
         'GWRRSSWO',
-        'WGGWWOOW')
+        'WGGWWOOW',
+        )
     bjwdField = BejeweledField(
         (((X, Y), V) for Y, Row in enumerate(Field) for X, V in enumerate(Row)))
     return bjwdField
 
+
+def star_combo_field():
+    Field = (
+        'WBBWWGGW',
+        'BWOOPPWG',
+        'BOWYYWPG',
+        'WOYWWBPW',
+        'WRYWWBSW',
+        'GRWBBWSO',
+        'GRRRSSWO',
+        'WGGWWOOW',
+        )
+    bjwdField = BejeweledField(
+        (((X, Y), V) for Y, Row in enumerate(Field) for X, V in enumerate(Row)))
+    return bjwdField
 
 def random_field():
     Field = (tuple((choice('BGROPSY') for _ in range(8)) for _ in range(8)))
@@ -276,13 +315,10 @@ def random_field():
 
 def main():
     Test = random_field()
-    improvedRowFormations, improvedColFormations, starFormations = collect_formations(Test)
-    print(Test, end='\n\n')
-    for Formation in chain(improvedRowFormations, improvedColFormations):
-        print(Formation)
-    print()
-    for Formation in starFormations:
-        print(Formation)
+    Formations = collect_something(Test)
+    # for Formation in chain(*Formations):
+        # print(Formation)
+    print_patterns(Test, chain(*Formations))
 
 if __name__ == '__main__':
     main()
