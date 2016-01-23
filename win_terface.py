@@ -16,11 +16,13 @@ the windows, screen captures and mouse actions of Microsoft Windows.
 
 from collections import namedtuple
 from functools import partial
+from time import sleep
 import ctypes
 
 from win32api import mouse_event, GetSystemMetrics
 import win32gui
 import win32ui
+
 
 WIN32 = ctypes.windll.kernel32
 
@@ -66,8 +68,8 @@ class WindowElement(object):
     Returns an object to manage and screen capture a window.
     """
  
-    def __init__(self, windowName=None, bringTop=False):
-        self.handle = identify_window(windowName)
+    def __init__(self, windowClass=None, windowName=None, bringTop=False):
+        self.handle = identify_window(windowClass, windowName)
         if bringTop:
             self.bring_to_top()
         windowDcHandle = win32gui.GetWindowDC(self.handle)
@@ -152,8 +154,8 @@ class CaptureImage(object):
         try:
             self.bitmap.SaveBitmapFile(self.context, filePathname)
         except win32ui.error:
-            errorMsg = 'No such file or directory: {}'
-            raise FileNotFoundError(errorMsg.format(filePathname))
+            errorMsg = 'No such file or directory: {}'.format(filePathname)
+            raise FileNotFoundError(errorMsg)
         
     def __getitem__(self, indexPair):
         """Returns the RGB of the bitmap's pixel at indexPair."""
@@ -173,12 +175,12 @@ class CaptureImage(object):
         return '{}'.format(self.__class__.__name__)
 
 
-def identify_window(windowName=None):
+def identify_window(windowClass=None, windowName=None):
     """Returns the window identifier by a window's title."""
     if windowName is None:
         windowID = win32gui.GetDesktopWindow()
     else:
-        windowID = win32gui.FindWindow(None, windowName)
+        windowID = win32gui.FindWindow(windowClass, windowName)
         if not windowID:
             windowID = distinguish_window(windowName)
     return windowID
@@ -206,7 +208,8 @@ def dimension_window(Left, Top, Right, Bottom):
 
 def convert_integer_rgb(intRGB):
     """Return RGB tuple from integer RGB."""
-    return PIXEL(*((intRGB >> Val) & 255 for Val in (0, 8, 16)))
+    # return PIXEL(*((intRGB >> Val) & 255 for Val in (0, 8, 16)))
+    return tuple((intRGB >> Val) & 255 for Val in (0, 8, 16))
 
 
 def execute_mouse(*actionPairs):
@@ -245,8 +248,8 @@ def print_colorized_board(Board, *Args, **kwArgs):
 
 def assemble_colorized_board(Board, *Args, **kwArgs):
     Colors = kwArgs.pop('Colors', PRINT_COLORS.copy())
-    assert len(Args) == len(Colors) - 2
-    otherColors = Colors[-2:]
+    assert len(Args) + 2 <= len(Colors)
+    otherColors = Colors.pop(), Colors.pop()
     argumentColors = list(zip(Args, Colors))
     coloredBoard = []
     for Y,  Row in enumerate(Board):
@@ -255,7 +258,7 @@ def assemble_colorized_board(Board, *Args, **kwArgs):
 
 
 def colorize_row(Row, argumentColors, otherColors, Y):
-    defaultColor, originalColor = otherColors
+    originalColor, defaultColor = otherColors
     for boardIndex, boardValue in Row:
         for argValue, Color in argumentColors:
             if boardIndex in argValue:
@@ -287,3 +290,17 @@ def colorize_row(Row, argumentColors, otherColors, Y):
     # compatibleDC.DeleteDC()
     # win32gui.ReleaseDC(windowID, windowDC)
     # win32gui.DeleteObject(dataBitMap.GetHandle())
+
+def print_window_info(Name, bringTop=False):
+    print('WindowInfo')
+    Msg = 'Class: {}, Title: {}'
+    def enum_caller(windowID, Name):
+        Title = win32gui.GetWindowText(windowID)
+        if bringTop and Name in Title:
+            print(Msg.format(win32gui.GetClassName(windowID), Title))
+            win32gui.ShowWindow(windowID, 1)  # Restores if minimized.
+            win32gui.SetForegroundWindow(windowID)
+            sleep(2)
+        elif Name in Title:
+            print(Msg.format(win32gui.GetClassName(windowID), Title))
+    win32gui.EnumWindows(enum_caller, Name)
