@@ -49,7 +49,7 @@ class MinesweeperInterface(OrderedDict):
     def __init__(self, **Options):
         OrderedDict.__init__(self)
         self.game_window = win_terface.WindowElement(
-            'Minesweeper', bringTop=True)
+            'Minesweeper', 'Minesweeper', bringTop=True)
         self.window_left, self.window_top, _, _ = self.game_window.position
         self.width_by_cells, self.height_by_cells = self.dimension_window()
         self.reset_button_index = (self.width_by_cells/2, -2)
@@ -81,6 +81,7 @@ class MinesweeperInterface(OrderedDict):
         return openCells, flagCells, saveDir
 
     def read_minefield(self, indexCollection=None):
+        sleep(3/1024)  # Otherwise may catch animation.
         if indexCollection is None:
             indexCollection = self.unsolved_cell_collection
         captureImage = self.capture_window_image()
