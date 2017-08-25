@@ -14,23 +14,36 @@ class TicTacToeEngine:
         self.gameBoard = OrderedDict(
             (f"{x}, {y}", " ") for x, y in twoDimIter(3, 3))
 
-    def isPlayerIndex(self, Index):
+    def isPlayer(self, Index):
         return self.gameBoard[Index] == self.currentPlayer 
 
+    def playersVector(self, Iter):
+        return (self.isPlayer(Index) for Index in Iter)
+
+    def rowIter(self, y):
+        return (f"{x}, {y}" for x in range(3))
+
+    def colIter(self, x):
+        return (f"{x}, {y}" for y in range(3))
+
+    def bDiagIter(self):
+        return (f"{z}, {z}" for z in range(3))
+
+    def fDiagIter(self):
+        return (f"{z}, {2 - z}" for z in range(3))
+
     def isRowWin(self, y):
-        return all(self.isPlayerIndex(f"{x}, {y}") for x in range(3))
+        return all(self.playersVector(self.rowIter(y)))
 
     def isColWin(self, x):
-        return all(self.isPlayerIndex(f"{x}, {y}") for y in range(3))
+        return all(self.playersVector(self.colIter(x)))
 
     def isBackDiagWin(self, x, y):
-        return (all(self.isPlayerIndex(f"{z}, {z}") for z in range(3))
-                if x == y else False)
+        return all(self.playersVector(self.bDiagIter())) if x == y else False
 
     def isFrontDiagWin(self, x, y):
-        adjust = 2;  # The maximium of range(3) is 2
-        return (all(self.isPlayerIndex(f"{z}, {adjust - z}") for z in range(3))
-                if int(x) == adjust - int(y) else False)
+        return (all(self.playersVector(self.fDiagIter()))
+                if int(x) == 2 - int(y) else False)
 
     def isWin(self):
         x, y = self.recentMove[0], self.recentMove[-1]
