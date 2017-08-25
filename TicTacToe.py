@@ -54,3 +54,51 @@ class TicTacToeEngine:
 
     def getNextPlayer(self):
         return "O" if self.currentMove % 2 else "X"
+
+
+class TicTacToe_Intelligence:
+
+    def __init__(self):
+        self.Engine = TicTacToeEngine()
+        self.Backup = self.Engine.gameBoard.copy()
+
+    def draw(self, values):
+        print("""
+{} | {} | {}
+--+---+--
+{} | {} | {}
+--+---+--
+{} | {} | {}
+        """.format(*values))
+
+    def countWinPossibilities(self, Player):
+        winCount = OrderedDict((Index, 0) for Index in twoDimIter(3, 3))
+        self.Engine.gameBoard["1, 1"] = "O"
+        for Index in self.Engine.gameBoard:
+            if self.Engine.gameBoard[Index] == " ":
+                self.Engine.gameBoard[Index] = Player 
+        for row in range(3):
+            if (self.Engine.isRowWin(row)):
+                for col in range(3):
+                    winCount[(col, row)] += 1
+        for col in range(3):
+            if (self.Engine.isColWin(col)):
+                for row in range(3):
+                    winCount[(col, row)] += 1
+        if (self.Engine.isBackDiagWin(0, 0)):
+            for z in range(3):
+                winCount[(z, z)] += 1
+        if (self.Engine.isFrontDiagWin(2, 0)):
+            for z in range(3):
+                winCount[(z, 2 - z)] += 1
+        # self.draw(self.Engine.gameBoard.values())
+        # self.draw(self.Backup.values())
+        self.draw(winCount.values())
+
+
+def main():
+    TicTacToe_Intelligence().countWinPossibilities("X")
+
+if __name__ == '__main__':
+    main()
+
