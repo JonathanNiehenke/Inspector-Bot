@@ -12,48 +12,40 @@ class TicTacToeEngine:
 
     def __init__(self):
         self.currentMove = 0;
-        self.recentMove = "1, 1";
+        self.recentMove = "0, 1";
         self.currentPlayer = "X";
         self.gameBoard = OrderedDict(
             (f"{x}, {y}", " ") for x, y in twoDimIter(3, 3))
 
-    def isGood(self, Index):
-        return self.gameBoard.get(Index, "") == " "
-
     def isPlayerIndex(self, Index):
         return self.gameBoard[Index] == self.currentPlayer 
 
-    def isRowWin(self, Index):
-        y = Index[-1]
+    def isRowWin(self, y):
         return all(self.isPlayerIndex(f"{x}, {y}") for x in range(3))
 
-    def isColWin(self, Index):
-        x = Index[0]
+    def isColWin(self, x):
         return all(self.isPlayerIndex(f"{x}, {y}") for y in range(3))
 
-    def isBackDiagWin(self, Index):
-        if Index[0] != Index[-1]:
-            return False
-        return all(self.isPlayerIndex(f"{z}, {z}") for z in range(3))
+    def isBackDiagWin(self, x, y):
+        return (all(self.isPlayerIndex(f"{z}, {z}") for z in range(3))
+                if x == y else False)
 
-    def isFrontDiagWin(self, Index):
-        adjust = 2;
-        if int(Index[0]) != adjust - int(Index[-1]):
-            return False
-        return all(self.isPlayerIndex(f"{z}, {adjust - z}") for z in range(3))
+    def isFrontDiagWin(self, x, y):
+        adjust = 2;  # The maximium of range(3) is 2
+        return (all(self.isPlayerIndex(f"{z}, {adjust - z}") for z in range(3))
+                if int(x) == adjust - int(y) else False)
 
     def isWin(self):
-        Idx = self.recentMove
-        return (self.isRowWin(Idx) or self.isColWin(Idx) or
-                self.isBackDiagWin(Idx) or self.isFrontDiagWin(Idx))
+        x, y = self.recentMove[0], self.recentMove[-1]
+        return (self.isRowWin(y) or self.isColWin(x) or
+                self.isBackDiagWin(x, y) or self.isFrontDiagWin(x, y))
 
     def isEnd(self):
         return self.isWin() or self.currentMove == 9
 
     def makeMove(self, Index):
-        if (self.isGood(Index)):
-            self.currentPlayer = self.getNextPlayer()
-            self.gameBoard[Index] = self.currentPlayer
+        if (self.gameBoard.get(Index, "") == " "):  # Is a valid move
+            self.gameBoard[Index] = self.currentPlayer = self.getNextPlayer()
             self.currentMove += 1
             self.recentMove = Index
             return True
@@ -82,13 +74,12 @@ class ConsoleTicTacToe:
         """.format(*self.Engine.gameBoard.values()))
 
     def playGame(self):
-        self.draw()
         while not self.Engine.isEnd():
-            print(f"Player {self.Engine.getNextPlayer()} to move.")
-            playerInput = input("Please enter the row, column coordinates.")
-            while not self.Engine.makeMove(playerInput):
-                playerInput = input("Please enter an empty row, column coordinate");
             self.draw()
+            print(f"Player {self.Engine.getNextPlayer()} to move.")
+            playerInput = input("Please enter the row, column coordinates ")
+            while not self.Engine.makeMove(playerInput):
+                playerInput = input("Please enter something like 1, 2");
         else:
             if self.Engine.isWin():
                 print(f"Player {self.Engine.getPlayer()} Won!!!")
@@ -106,15 +97,11 @@ class GuiTicTacToe:
         tk.Label(self.Window, textvar=self.msgText).grid(
             row=0, column=0, columnspan=3)
 
-    def disableButtons(self):
+    def endGame(self):
+        self.msgText.set(f"Player {self.Engine.getPlayer()} Won!!!"
+                         if self.Engine.isWin() else "Tie game")
         for button in self.buttons.values():
             button.configure(state="disabled")
-
-    def endGame(self):
-        self.disableButtons()
-        self.msgText.set(f"Player {self.Engine.getPlayer()} Won!!!"
-            if self.Engine.isWin() else "Tie game")
-
 
     def buttonPress(self, x, y):
         if self.Engine.makeMove(f"{x}, {y}"):
@@ -122,13 +109,12 @@ class GuiTicTacToe:
             self.msgText.set(f"Player {self.Engine.getNextPlayer()} to move.")
             if (self.Engine.isEnd()):
                 self.endGame()
-                
 
     def createButtons(self):
         buttons = {}
         for x, y in twoDimIter(3, 3):
-            button = tk.Button(
-                self.Window, text=" ", command=partial(self.buttonPress, x, y))
+            thisButtonPress = partial(self.buttonPress, x, y)
+            button = tk.Button(self.Window, text=" ", command=thisButtonPress)
             button.grid(row=(x+1), column=y, padx=8, pady=8)
             buttons[(x, y)] = button
         return buttons
@@ -139,8 +125,8 @@ class GuiTicTacToe:
 
 
 def main():
-    TicTacToe = GuiTicTacToe()
-    TicTacToe.playGame()
+    # ConsoleTicTacToe().playGame()
+    GuiTicTacToe().playGame()
 
 if __name__ == '__main__':
     main()
