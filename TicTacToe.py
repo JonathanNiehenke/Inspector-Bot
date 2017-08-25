@@ -114,7 +114,8 @@ class GuiTicTacToe:
         buttons = {}
         for x, y in twoDimIter(3, 3):
             thisButtonPress = partial(self.buttonPress, x, y)
-            button = tk.Button(self.Window, text=" ", command=thisButtonPress)
+            button = tk.Button(self.Window, text=" ", font=('Courier', 18),
+                               command=thisButtonPress)
             button.grid(row=(x+1), column=y, padx=8, pady=8)
             buttons[(x, y)] = button
         return buttons
