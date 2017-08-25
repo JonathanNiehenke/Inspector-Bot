@@ -1,5 +1,12 @@
 from collections import OrderedDict
+from functools import partial
+import tkinter as tk
 import os
+
+def twoDimIter(width, height):
+    for y in range(height):
+        for x in range(width):
+            yield (x, y)
 
 class TicTacToeEngine:
 
@@ -7,7 +14,8 @@ class TicTacToeEngine:
         self.currentMove = 0;
         self.recentMove = "1, 1";
         self.currentPlayer = "X";
-        self.gameBoard = OrderedDict((f"{x}, {y}", " ") for y in range(3) for x in range(3))
+        self.gameBoard = OrderedDict(
+            (f"{x}, {y}", " ") for x, y in twoDimIter(3, 3))
 
     def isGood(self, Index):
         return self.gameBoard.get(Index, "") == " "
@@ -40,13 +48,13 @@ class TicTacToeEngine:
                 self.isBackDiagWin(Idx) or self.isFrontDiagWin(Idx))
 
     def isEnd(self):
-        return self.isWin() or self.currentMove == 8
+        return self.isWin() or self.currentMove == 9
 
     def makeMove(self, Index):
         if (self.isGood(Index)):
             self.currentPlayer = self.getNextPlayer()
             self.gameBoard[Index] = self.currentPlayer
-            self.currentMove +=1 
+            self.currentMove += 1
             self.recentMove = Index
             return True
         return False
@@ -88,8 +96,50 @@ class ConsoleTicTacToe:
                 print("Tie game")
 
 
+class GuiTicTacToe:
+
+    def __init__(self):
+        self.Engine = TicTacToeEngine()
+        self.Window = tk.Tk()
+        self.msgText = tk.StringVar()
+        self.buttons = self.createButtons()
+        tk.Label(self.Window, textvar=self.msgText).grid(
+            row=0, column=0, columnspan=3)
+
+    def disableButtons(self):
+        for button in self.buttons.values():
+            button.configure(state="disabled")
+
+    def endGame(self):
+        self.disableButtons()
+        self.msgText.set(f"Player {self.Engine.getPlayer()} Won!!!"
+            if self.Engine.isWin() else "Tie game")
+
+
+    def buttonPress(self, x, y):
+        if self.Engine.makeMove(f"{x}, {y}"):
+            self.buttons[(x, y)].configure(text=self.Engine.getPlayer())
+            self.msgText.set(f"Player {self.Engine.getNextPlayer()} to move.")
+            if (self.Engine.isEnd()):
+                self.endGame()
+                
+
+    def createButtons(self):
+        buttons = {}
+        for x, y in twoDimIter(3, 3):
+            button = tk.Button(
+                self.Window, text=" ", command=partial(self.buttonPress, x, y))
+            button.grid(row=(x+1), column=y, padx=8, pady=8)
+            buttons[(x, y)] = button
+        return buttons
+
+    def playGame(self):
+        self.msgText.set(f"Player {self.Engine.getNextPlayer()} to move.")
+        self.Window.mainloop()
+
+
 def main():
-    TicTacToe = ConsoleTicTacToe()
+    TicTacToe = GuiTicTacToe()
     TicTacToe.playGame()
 
 if __name__ == '__main__':
