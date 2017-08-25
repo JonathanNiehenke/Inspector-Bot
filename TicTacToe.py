@@ -74,6 +74,30 @@ class TicTacToe_Intelligence:
             if self.Engine.gameBoard[Index] == " ":
                 self.Engine.gameBoard[Index] = Player 
 
+    def countRowWins(self, row, winCount):
+        if (self.Engine.isRowWin(row)):
+            for col in range(3):
+                winCount[(col, row)] += 1
+
+    def countColWins(self, col, winCount):
+        if (self.Engine.isColWin(col)):
+            for row in range(3):
+                winCount[(col, row)] += 1
+
+    def countBDiagWins(self, winCount):
+        if (self.Engine.isBackDiagWin(0, 0)):
+            for z in range(3):
+                winCount[(z, z)] += 1
+
+    def countFDiagWins(self, winCount):
+        if (self.Engine.isFrontDiagWin(2, 0)):
+            for z in range(3):
+                winCount[(z, 2 - z)] += 1
+
+    def foreachVec(self, func, *args):
+        for vec in range(3):
+            func(vec, *args)
+
     def invertCount(self, countDict):
         invDict = {}
         for Index, Count in countDict.items():
@@ -87,23 +111,13 @@ class TicTacToe_Intelligence:
     def countWinPossibilities(self, Player):
         winCount = OrderedDict((Index, 0) for Index in twoDimIter(3, 3))
         self.Engine.currentPlayer = Player
-        backup = self.Engine.gameBoard.copy()
+        backup = self.Engine.gameBoard.copy()  # Create backup
         self.fillGameBoard(Player)
-        for row in range(3):
-            if (self.Engine.isRowWin(row)):
-                for col in range(3):
-                    winCount[(col, row)] += 1
-        for col in range(3):
-            if (self.Engine.isColWin(col)):
-                for row in range(3):
-                    winCount[(col, row)] += 1
-        if (self.Engine.isBackDiagWin(0, 0)):
-            for z in range(3):
-                winCount[(z, z)] += 1
-        if (self.Engine.isFrontDiagWin(2, 0)):
-            for z in range(3):
-                winCount[(z, 2 - z)] += 1
-        self.Engine.gameBoard = backup
+        self.foreachVec(self.countRowWins, winCount)
+        self.foreachVec(self.countColWins, winCount)
+        self.countBDiagWins(winCount)
+        self.countFDiagWins(winCount)
+        self.Engine.gameBoard = backup  # Restore backup
         # self.draw(winCount.values())
         return winCount
         # self.draw(self.Engine.gameBoard.values())
