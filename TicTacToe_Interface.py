@@ -1,15 +1,18 @@
 from functools import partial
 import tkinter as tk
+import os
 
-from TicTacToe import twoDimIter, TicTacToeEngine
+from TicTacToe import twoDimIter, TicTacToeEngine, TicTacToe_Intelligence
 
 class ConsoleTicTacToe:
 
-    def __init__(self):
+    def __init__(self, cpu=None):
         self.Engine = TicTacToeEngine()
+        self.cpu = cpu
+        self.playGame = self.playGame_HvH if cpu is None else  self.playGame_HvC
 
     def draw(self):
-        os.system("cls")
+        # os.system("cls")
         print("""
 {} | {} | {}
 --+---+--
@@ -18,18 +21,36 @@ class ConsoleTicTacToe:
 {} | {} | {}
         """.format(*self.Engine.gameBoard.values()))
 
-    def playGame(self):
+    def playerMove(self):
+        self.draw()
+        print(f"Player {self.Engine.getNextPlayer()} to move.")
+        playerInput = input("Please enter the column, row coordinates: ")
+        while not self.Engine.makeMove(playerInput):
+            playerInput = input("Please enter something like 1, 2");
+        return playerInput
+
+    def playGame_HvH(self):
         while not self.Engine.isEnd():
-            self.draw()
-            print(f"Player {self.Engine.getNextPlayer()} to move.")
-            playerInput = input("Please enter the column, row coordinates ")
-            while not self.Engine.makeMove(playerInput):
-                playerInput = input("Please enter something like 1, 2");
+            self.playerMove()
         else:
+            self.draw()
             if self.Engine.isWin():
                 print(f"Player {self.Engine.getPlayer()} Won!!!")
             else:
                 print("Tie game")
+
+    def playGame_HvC(self):
+        while not self.Engine.isEnd():
+            self.Engine.makeMove(self.cpu.makeMove())
+            if not self.Engine.isEnd():
+                self.cpu.opponentMove(self.playerMove())
+        else:
+            self.draw()
+            if self.Engine.isWin():
+                print(f"Player {self.Engine.getPlayer()} Won!!!")
+            else:
+                print("Tie game")
+
 
 
 class GuiTicTacToe:
@@ -70,9 +91,8 @@ class GuiTicTacToe:
         self.Window.mainloop()
 
 def main():
-    # ConsoleTicTacToe().playGame()
-    GuiTicTacToe().playGame()
+    ConsoleTicTacToe(TicTacToe_Intelligence()).playGame()
+    # GuiTicTacToe().playGame()
 
 if __name__ == '__main__':
     main()
-

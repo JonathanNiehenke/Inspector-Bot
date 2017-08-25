@@ -1,5 +1,4 @@
 from collections import OrderedDict
-import os
 
 def twoDimIter(width, height):
     for y in range(height):
@@ -60,7 +59,6 @@ class TicTacToe_Intelligence:
 
     def __init__(self):
         self.Engine = TicTacToeEngine()
-        self.Backup = self.Engine.gameBoard.copy()
 
     def draw(self, values):
         print("""
@@ -71,12 +69,26 @@ class TicTacToe_Intelligence:
 {} | {} | {}
         """.format(*values))
 
-    def countWinPossibilities(self, Player):
-        winCount = OrderedDict((Index, 0) for Index in twoDimIter(3, 3))
-        self.Engine.gameBoard["1, 1"] = "O"
+    def fillGameBoard(self, Player):
         for Index in self.Engine.gameBoard:
             if self.Engine.gameBoard[Index] == " ":
                 self.Engine.gameBoard[Index] = Player 
+
+    def invertCount(self, countDict):
+        invDict = {}
+        for Index, Count in countDict.items():
+            invDict.setdefault(Count, []).append(Index)
+        return invDict
+
+    def sortCount(self, countDict):
+        nestedSort = sorted(self.invertCount(countDict).items(), reverse=True)
+        return [v for _, l in nestedSort for v in l]
+
+    def countWinPossibilities(self, Player):
+        winCount = OrderedDict((Index, 0) for Index in twoDimIter(3, 3))
+        self.Engine.currentPlayer = Player
+        backup = self.Engine.gameBoard.copy()
+        self.fillGameBoard(Player)
         for row in range(3):
             if (self.Engine.isRowWin(row)):
                 for col in range(3):
@@ -91,14 +103,22 @@ class TicTacToe_Intelligence:
         if (self.Engine.isFrontDiagWin(2, 0)):
             for z in range(3):
                 winCount[(z, 2 - z)] += 1
+        self.Engine.gameBoard = backup
+        # self.draw(winCount.values())
+        return winCount
         # self.draw(self.Engine.gameBoard.values())
         # self.draw(self.Backup.values())
-        self.draw(winCount.values())
 
+    def makeMove(self):
+        # self.draw(self.Engine.gameBoard.values())
+        # print(self.sortCount(self.countWinPossibilities("O")))
+        # print("Internal board")
+        # self.draw(self.Engine.gameBoard.values())
+        for index in self.sortCount(self.countWinPossibilities("X")):
+            move = "{}, {}".format(*index)
+            if self.Engine.makeMove(move):
+                break
+        return move
 
-def main():
-    TicTacToe_Intelligence().countWinPossibilities("X")
-
-if __name__ == '__main__':
-    main()
-
+    def opponentMove(self, move):
+        self.Engine.makeMove(move);
