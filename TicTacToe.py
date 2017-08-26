@@ -1,4 +1,4 @@
-from collections import OrderedDict
+from collections import OrderedDict, deque
 
 def twoDimIter(width, height):
     for y in range(height):
@@ -65,6 +65,7 @@ class TicTacToe_Intelligence:
 
     def __init__(self):
         self.Engine = TicTacToeEngine()
+        self.priorityMoves = deque()
 
     def draw(self, values):
         print("""
@@ -75,35 +76,23 @@ class TicTacToe_Intelligence:
 {} | {} | {}
         """.format(*values))
 
-    def countAlongVec(self, vec, Iter):
-        return sum(self.Engine.playersVector(Iter(vec)))
+    def countAlongVec(self, Vector):
+        return sum(self.Engine.playersVector(Vector))
 
-    def getEmpty(self, vec, Iter):
-        for Index in Iter(vec):
+    def getEmpty(self, Vector):
+        for Index in Vector:
             if self.Engine.gameBoard[Index] == " ":
                 return Index
 
-    def getDefensiveMove(self):
-        for vec in range(3):
-            if self.countAlongVec(vec, self.Engine.rowIter) == 2:
-                move = self.getEmpty(vec, self.Engine.rowIter)
-                if move is not None: return move
-            elif self.countAlongVec(vec, self.Engine.colIter) == 2:
-                move = self.getEmpty(vec, self.Engine.colIter)
-                if move is not None: return move
-        if sum(self.Engine.playersVector(self.Engine.bDiagIter(None))) == 2:
-            move = self.getEmpty(None, self.Engine.bDiagIter)
-            if move is not None: return move
-        elif sum(self.Engine.playersVector(self.Engine.fDiagIter(None))) == 2:
-            move = self.getEmpty(None, self.Engine.fDiagIter)
-            if move is not None: return move
+    def getNextVecWin(self, x, y, Iter):
+        if self.countAlongVec(Iter(x, y)) == 2:
+            return self.getEmpty(Iter(x, y))
 
-    def getWinningMove(self):
-        currentPlayer = self.Engine.currentPlayer
-        self.Engine.currentPlayer = self.Engine.getNextPlayer()
-        move = self.getDefensiveMove()
-        self.Engine.currentPlayer = currentPlayer
-        return move
+    def getWinningMoves(self, move):
+        x, y = move[0], move[-1]
+        winAlongVecs = (self.getNextVecWin(x, y, Iter)
+                        for Iter in self.Engine.vectorIters)
+        return [move for move in winAlongVecs if move is not None]
 
     def fillGameBoard(self, Player):
         for Index in self.Engine.gameBoard:
@@ -156,25 +145,21 @@ class TicTacToe_Intelligence:
         self.Engine.gameBoard = backup  # Restore backup
         # self.draw(winCount.values())
         return winCount
-        # self.draw(self.Engine.gameBoard.values())
-        # self.draw(self.Backup.values())
 
     def makeMove(self):
-        # self.draw(self.Engine.gameBoard.values())
-        # print(self.sortCount(self.countWinPossibilities("O")))
-        # print("Internal board")
-        # self.draw(self.Engine.gameBoard.values())
-        move = self.getWinningMove()
-        # print(f"Win move {move}")
-        move = self.getDefensiveMove() if move is None else move
-        # print(f"Def move {move}")
-        if move is None:
-            for Index in self.sortCount(self.countWinPossibilities("X")):
+        # print(self.priorityMoves)
+        while self.priorityMoves:
+            move = self.priorityMoves.popleft()
+            if self.Engine.gameBoard.get(move, "") == " ": break
+        else:
+            for Index in self.sortCount(
+                    self.countWinPossibilities(self.Engine.getNextPlayer())):
                 move = "{}, {}".format(*Index)
                 if self.Engine.gameBoard.get(move, "") == " ": break
         self.Engine.makeMove(move)
-        # print(move)
+        self.priorityMoves.extend(self.getWinningMoves(move))
         return move
 
     def opponentMove(self, move):
         self.Engine.makeMove(move);
+        self.priorityMoves.extend(self.getWinningMoves(move))
