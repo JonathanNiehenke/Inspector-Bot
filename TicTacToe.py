@@ -13,43 +13,35 @@ class TicTacToeEngine:
         self.currentPlayer = "X";
         self.gameBoard = OrderedDict(
             (f"{x}, {y}", " ") for x, y in twoDimIter(3, 3))
+        self.vectorIters = (
+            self.rowIter, self.colIter, self.bDiagIter, self.fDiagIter)
 
     def isPlayer(self, Index):
         return self.gameBoard[Index] == self.currentPlayer 
 
-    def playersVector(self, Iter):
-        return (self.isPlayer(Index) for Index in Iter)
+    def playersVector(self, Vector):
+        return (self.isPlayer(Index) for Index in Vector)
 
-    def rowIter(self, y):
+    def rowIter(self, _, y):
         return (f"{x}, {y}" for x in range(3))
 
-    def colIter(self, x):
+    def colIter(self, x, _):
         return (f"{x}, {y}" for y in range(3))
 
-    def bDiagIter(self, _):
-        return (f"{z}, {z}" for z in range(3))
+    def bDiagIter(self, x, y):
+        return (f"{z}, {z}" for z in range(3)) if x == y else ()
 
-    def fDiagIter(self, _):
-        return (f"{z}, {2 - z}" for z in range(3))
+    def fDiagIter(self, x, y):
+        return ((f"{z}, {2 - z}" for z in range(3))
+                if int(x) == 2 - int(y) else ())
 
-    def isRowWin(self, y):
-        return all(self.playersVector(self.rowIter(y)))
-
-    def isColWin(self, x):
-        return all(self.playersVector(self.colIter(x)))
-
-    def isBackDiagWin(self, x, y):
-        return (all(self.playersVector(self.bDiagIter(None)))
-                    if x == y else False)
-
-    def isFrontDiagWin(self, x, y):
-        return (all(self.playersVector(self.fDiagIter(None)))
-                if int(x) == 2 - int(y) else False)
+    def isVectorWin(self, Vector):
+        # Prevent returning True if empty as expected from diagonals
+        return all(self.playersVector(Vector)) if Vector else False
 
     def isWin(self):
         x, y = self.recentMove[0], self.recentMove[-1]
-        return (self.isRowWin(y) or self.isColWin(x) or
-                self.isBackDiagWin(x, y) or self.isFrontDiagWin(x, y))
+        return any(self.isVectorWin(Iter(x, y)) for Iter in self.vectorIters)
 
     def isEnd(self):
         return self.isWin() or self.currentMove == 9
@@ -118,23 +110,23 @@ class TicTacToe_Intelligence:
             if self.Engine.gameBoard[Index] == " ":
                 self.Engine.gameBoard[Index] = Player 
 
-    def countRowWins(self, row, winCount):
-        if (self.Engine.isRowWin(row)):
-            for col in range(3):
-                winCount[(col, row)] += 1
+    def countRowWins(self, y, winCount):
+        if (self.Engine.isVectorWin(self.Engine.rowIter(None, y))):
+            for x in range(3):
+                winCount[(x, y)] += 1
 
-    def countColWins(self, col, winCount):
-        if (self.Engine.isColWin(col)):
-            for row in range(3):
-                winCount[(col, row)] += 1
+    def countColWins(self, x, winCount):
+        if (self.Engine.isVectorWin(self.Engine.colIter(x, None))):
+            for y in range(3):
+                winCount[(x, y)] += 1
 
     def countBDiagWins(self, winCount):
-        if (self.Engine.isBackDiagWin(0, 0)):
+        if (self.Engine.isVectorWin(self.Engine.bDiagIter(0, 0))):
             for z in range(3):
                 winCount[(z, z)] += 1
 
     def countFDiagWins(self, winCount):
-        if (self.Engine.isFrontDiagWin(2, 0)):
+        if (self.Engine.isVectorWin(self.Engine.fDiagIter(2, 0))):
             for z in range(3):
                 winCount[(z, 2 - z)] += 1
 
