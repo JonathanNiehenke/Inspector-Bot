@@ -55,11 +55,14 @@ class ConsoleTicTacToe:
 
 class GuiTicTacToe:
 
-    def __init__(self):
+    def __init__(self, cpu):
         self.Engine = TicTacToeEngine()
+        self.cpu = cpu
         self.Window = tk.Tk()
-        self.msgText = tk.StringVar()
+        self.buttonPress = (
+            self.buttonPress_HvH if cpu is None else  self.buttonPress_HvC)
         self.buttons = self.createButtons()
+        self.msgText = tk.StringVar()
         tk.Label(self.Window, textvar=self.msgText).grid(
             row=0, column=0, columnspan=3)
 
@@ -69,12 +72,32 @@ class GuiTicTacToe:
         for button in self.buttons.values():
             button.configure(state="disabled")
 
-    def buttonPress(self, x, y):
-        if self.Engine.makeMove(f"{x}, {y}"):
+    def buttonPress_HvH(self, x, y):
+        move = f"{x}, {y}"
+        if self.Engine.makeMove(move):
             self.buttons[(x, y)].configure(text=self.Engine.getPlayer())
             self.msgText.set(f"Player {self.Engine.getNextPlayer()} to move.")
             if (self.Engine.isEnd()):
                 self.endGame()
+
+    def cpuMove(self):
+        move = self.cpu.makeMove()
+        self.Engine.makeMove(move)
+        self.buttons[move].configure(text=self.Engine.getPlayer())
+        self.msgText.set(f"Player {self.Engine.getNextPlayer()} to move.")
+        if (self.Engine.isEnd()):
+            self.endGame()
+
+    def buttonPress_HvC(self, x, y):
+        move = f"{x}, {y}"
+        if self.Engine.makeMove(move):
+            self.buttons[move].configure(text=self.Engine.getPlayer())
+            self.msgText.set(f"Player {self.Engine.getNextPlayer()} to move.")
+            if (self.Engine.isEnd()):
+                self.endGame()
+                return
+            self.cpu.opponentMove(move)
+            self.cpuMove()
 
     def createButtons(self):
         buttons = {}
@@ -82,8 +105,8 @@ class GuiTicTacToe:
             thisButtonPress = partial(self.buttonPress, x, y)
             button = tk.Button(self.Window, text=" ", font=('Courier', 18),
                                command=thisButtonPress)
-            button.grid(row=(x+1), column=y, padx=8, pady=8)
-            buttons[(x, y)] = button
+            button.grid(row=(y+1), column=x, padx=8, pady=8)
+            buttons[f"{x}, {y}"] = button
         return buttons
 
     def playGame(self):
@@ -91,8 +114,8 @@ class GuiTicTacToe:
         self.Window.mainloop()
 
 def main():
-    ConsoleTicTacToe(TicTacToe_Intelligence()).playGame()
-    # GuiTicTacToe().playGame()
+    # ConsoleTicTacToe(TicTacToe_Intelligence()).playGame()
+    GuiTicTacToe(TicTacToe_Intelligence()).playGame()
 
 if __name__ == '__main__':
     main()
