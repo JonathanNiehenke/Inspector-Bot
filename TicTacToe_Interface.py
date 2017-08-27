@@ -10,24 +10,32 @@ class ConsoleTicTacToe:
     def __init__(self, cpu=None):
         self.Engine = TicTacToeEngine()
         self.cpu = cpu
-        self.playGame = self.playGame_HvH if cpu is None else  self.playGame_HvC
+        vsCpu, self.gameAmount = self.provideOptions()
+        self.gameCount = 0
+        self.playGame = self.playGame_HvC if vsCpu else  self.playGame_HvH
+
+    def provideOptions(self):
+        vsCPU = input("1. Player or 2. CPU: ") == "2"
+        gamesAmount = int(input("How many games? (Even number): "))
+        return vsCPU, gamesAmount
 
     def draw(self):
-        # os.system("cls")
+        os.system("cls")
         print("""
+Game {}:
 {} | {} | {}
 --+---+--
 {} | {} | {}
 --+---+--
 {} | {} | {}
-        """.format(*self.Engine.gameBoard.values()))
+        """.format(self.gameCount + 1, *self.Engine.gameBoard.values()))
+        print()
 
     def playerMove(self):
         self.draw()
-        print(f"Player {self.Engine.getNextPlayer()} to move.")
         playerInput = input("Please enter the column, row coordinates: ")
         while not self.Engine.makeMove(playerInput):
-            playerInput = input("Please enter something like 1, 2");
+            playerInput = input("Please enter something like 1, 2: ");
         return playerInput
 
     def playGame_HvH(self):
@@ -39,18 +47,29 @@ class ConsoleTicTacToe:
                 print(f"Player {self.Engine.getPlayer()} Won!!!")
             else:
                 print("Tie game")
+            input("Press Enter...")
 
     def playGame_HvC(self):
         while not self.Engine.isEnd():
-            self.Engine.makeMove(self.cpu.makeMove())
+            self.cpu.opponentMove(self.playerMove())
             if not self.Engine.isEnd():
-                self.cpu.opponentMove(self.playerMove())
+                self.Engine.makeMove(self.cpu.makeMove())
         else:
             self.draw()
             if self.Engine.isWin():
                 print(f"Player {self.Engine.getPlayer()} Won!!!")
             else:
                 print("Tie game")
+            input("Press Enter...")
+
+    def playGameSet(self):
+        for self.gameCount in range(self.gameAmount):
+            self.playGame()
+            self.Engine.reset()
+            if self.playGame == self.playGame_HvC:
+                self.cpu.reset()
+                if self.gameCount % 2 == 0:
+                    self.Engine.makeMove(self.cpu.makeMove())
 
 
 class OptionsFrame(tk.Frame):
@@ -179,8 +198,8 @@ class GuiTicTacToe:
 
 
 def main():
-    # ConsoleTicTacToe(TicTacToe_Intelligence()).playGame()
-    GuiTicTacToe(TicTacToe_Intelligence()).playGame()
+    ConsoleTicTacToe(TicTacToe_Intelligence()).playGameSet()
+    # GuiTicTacToe(TicTacToe_Intelligence()).playGame()
 
 if __name__ == '__main__':
     main()
