@@ -130,6 +130,10 @@ class GuiTicTacToe:
         if self.gameCount < self.gameAmount:
             self.gameCount += 1
             self.reset()
+            if self.buttonPress == self.buttonPress_HvC:
+                self.cpu.reset()
+                if self.gameCount % 2 == 0:
+                    self.cpuMove()
         else:
             self.Window.destroy()
 

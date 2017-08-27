@@ -168,3 +168,7 @@ class TicTacToe_Intelligence:
     def opponentMove(self, move):
         self.Engine.makeMove(move);
         self.priorityMoves.extend(self.getWinningMoves(move))
+
+    def reset(self):
+        self.Engine.reset()
+        self.priorityMoves.clear()
