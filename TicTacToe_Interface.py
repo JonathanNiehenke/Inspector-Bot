@@ -52,15 +52,62 @@ class ConsoleTicTacToe:
                 print("Tie game")
 
 
+class OptionsFrame(tk.Frame):
+
+    def __init__(self, parent):
+        tk.Frame.__init__(self, parent)
+        self.parent = parent
+        self.gameNum = 2
+        self.vsCpu = tk.BooleanVar()
+        self.playMsg = tk.StringVar()
+        # tk widgets
+        self.playerRadio = tk.Radiobutton(
+            self,
+            text="Player",
+            variable=self.vsCpu,
+            value=False,
+            indicatoron=0)
+        self.cpuRadio = tk.Radiobutton(
+            self,
+            text="CPU",
+            variable=self.vsCpu,
+            value=True,
+            indicatoron=0)
+        self.increaseBtn = tk.Button(
+            self, text="+2", command=partial(self.increaseGames, 2))
+        self.decreaseBtn = tk.Button(
+            self, text="-2",command=partial(self.increaseGames, -2))
+        tk.Button(self, textvar=self.playMsg, command=self.playGame).grid(
+            row=2, column=0, columnspan=2, sticky="nsew")
+
+    def provideOptions(self):
+        self.playMsg.set(f"Play {self.gameNum} games")
+        self.playerRadio.grid(row=0, column=0, sticky="nsew")
+        self.cpuRadio.grid(row=0, column=1, sticky="nsew")
+        self.increaseBtn.grid(row=1, column=0, sticky="nsew")
+        self.decreaseBtn.grid(row=1, column=1, sticky="nsew")
+        self.grid(row=0, column=0)
+        self.parent.wait_window(self)
+        return self.vsCpu.get(), self.gameNum
+
+    def increaseGames(self, value):
+        self.gameNum += value
+        self.playMsg.set(f"Play {self.gameNum} games")
+
+    def playGame(self):
+        self.destroy()
+
 
 class GuiTicTacToe:
 
-    def __init__(self, cpu):
+    def __init__(self, cpu=None):
+        self.Window = tk.Tk()
         self.Engine = TicTacToeEngine()
         self.cpu = cpu
-        self.Window = tk.Tk()
+        Welcome = OptionsFrame(self.Window)
+        vsCpu, gameNum = Welcome.provideOptions()
         self.buttonPress = (
-            self.buttonPress_HvH if cpu is None else  self.buttonPress_HvC)
+            self.buttonPress_HvC if vsCpu  else self.buttonPress_HvH)
         self.buttons = self.createButtons()
         self.msgText = tk.StringVar()
         tk.Label(self.Window, textvar=self.msgText).grid(
@@ -75,7 +122,7 @@ class GuiTicTacToe:
     def buttonPress_HvH(self, x, y):
         move = f"{x}, {y}"
         if self.Engine.makeMove(move):
-            self.buttons[(x, y)].configure(text=self.Engine.getPlayer())
+            self.buttons[move].configure(text=self.Engine.getPlayer())
             self.msgText.set(f"Player {self.Engine.getNextPlayer()} to move.")
             if (self.Engine.isEnd()):
                 self.endGame()
@@ -95,9 +142,9 @@ class GuiTicTacToe:
             self.msgText.set(f"Player {self.Engine.getNextPlayer()} to move.")
             if (self.Engine.isEnd()):
                 self.endGame()
-                return
-            self.cpu.opponentMove(move)
-            self.cpuMove()
+            else:
+                self.cpu.opponentMove(move)
+                self.cpuMove()
 
     def createButtons(self):
         buttons = {}
