@@ -1,4 +1,5 @@
 from functools import partial
+from tkinter import messagebox
 import tkinter as tk
 import os
 
@@ -104,8 +105,8 @@ class GuiTicTacToe:
         self.Window = tk.Tk()
         self.Engine = TicTacToeEngine()
         self.cpu = cpu
-        Welcome = OptionsFrame(self.Window)
-        vsCpu, gameNum = Welcome.provideOptions()
+        vsCpu, self.gameAmount = OptionsFrame(self.Window).provideOptions()
+        self.gameCount = 1
         self.buttonPress = (
             self.buttonPress_HvC if vsCpu  else self.buttonPress_HvH)
         self.buttons = self.createButtons()
@@ -113,33 +114,45 @@ class GuiTicTacToe:
         tk.Label(self.Window, textvar=self.msgText).grid(
             row=0, column=0, columnspan=3)
 
+    def reset(self):
+        self.Engine.reset()
+        self.msgText.set(f"Player {self.Engine.getNextPlayer()} to move.")
+        for button in self.buttons.values():
+            button.configure(text=" ", state="normal")
+
     def endGame(self):
-        self.msgText.set(f"Player {self.Engine.getPlayer()} Won!!!"
-                         if self.Engine.isWin() else "Tie game")
         for button in self.buttons.values():
             button.configure(state="disabled")
+        Title = f"Game {self.gameCount}"
+        Msg = (f"player {self.Engine.getPlayer()} Won!!!"
+               if self.Engine.isWin() else "Tie game")
+        tk.messagebox.showinfo(Title, Msg)
+        if self.gameCount < self.gameAmount:
+            self.gameCount += 1
+            self.reset()
+        else:
+            self.Window.destroy()
 
     def buttonPress_HvH(self, x, y):
         move = f"{x}, {y}"
         if self.Engine.makeMove(move):
             self.buttons[move].configure(text=self.Engine.getPlayer())
-            self.msgText.set(f"Player {self.Engine.getNextPlayer()} to move.")
             if (self.Engine.isEnd()):
                 self.endGame()
+            self.msgText.set(f"Player {self.Engine.getNextPlayer()} to move.")
 
     def cpuMove(self):
         move = self.cpu.makeMove()
         self.Engine.makeMove(move)
         self.buttons[move].configure(text=self.Engine.getPlayer())
-        self.msgText.set(f"Player {self.Engine.getNextPlayer()} to move.")
         if (self.Engine.isEnd()):
             self.endGame()
+        self.msgText.set(f"Player {self.Engine.getNextPlayer()} to move.")
 
     def buttonPress_HvC(self, x, y):
         move = f"{x}, {y}"
         if self.Engine.makeMove(move):
             self.buttons[move].configure(text=self.Engine.getPlayer())
-            self.msgText.set(f"Player {self.Engine.getNextPlayer()} to move.")
             if (self.Engine.isEnd()):
                 self.endGame()
             else:
@@ -159,6 +172,7 @@ class GuiTicTacToe:
     def playGame(self):
         self.msgText.set(f"Player {self.Engine.getNextPlayer()} to move.")
         self.Window.mainloop()
+
 
 def main():
     # ConsoleTicTacToe(TicTacToe_Intelligence()).playGame()

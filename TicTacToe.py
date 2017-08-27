@@ -60,6 +60,11 @@ class TicTacToeEngine:
     def getNextPlayer(self):
         return "O" if self.currentMove % 2 else "X"
 
+    def reset(self):
+        for Index in self.gameBoard:
+            self.gameBoard[Index] = " "
+            self.currentMove = 0
+
 
 class TicTacToe_Intelligence:
 
