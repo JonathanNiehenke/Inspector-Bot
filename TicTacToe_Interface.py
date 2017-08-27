@@ -1,7 +1,9 @@
 from functools import partial
 from tkinter import messagebox
+from sys import argv
 import tkinter as tk
 import os
+
 
 from TicTacToe import twoDimIter, TicTacToeEngine, TicTacToe_Intelligence
 
@@ -9,7 +11,7 @@ class ConsoleTicTacToe:
 
     def __init__(self, cpu=None):
         self.Engine = TicTacToeEngine()
-        self.cpu = cpu
+        self.cpu = cpu if cpu else TicTacToe_Intelligence()
         vsCpu, self.gameAmount = self.provideOptions()
         self.gameCount = 0
         self.playGame = self.playGame_HvC if vsCpu else  self.playGame_HvH
@@ -123,7 +125,7 @@ class GuiTicTacToe:
     def __init__(self, cpu=None):
         self.Window = tk.Tk()
         self.Engine = TicTacToeEngine()
-        self.cpu = cpu
+        self.cpu = cpu if cpu else TicTacToe_Intelligence()
         vsCpu, self.gameAmount = OptionsFrame(self.Window).provideOptions()
         self.gameCount = 1
         self.buttonPress = (
@@ -198,8 +200,11 @@ class GuiTicTacToe:
 
 
 def main():
-    ConsoleTicTacToe(TicTacToe_Intelligence()).playGameSet()
-    # GuiTicTacToe(TicTacToe_Intelligence()).playGame()
+    try:
+        Interface = GuiTicTacToe() if argv[1] == "GUI" else ConsoleTicTacToe()
+    except:
+        Interface = ConsoleTicTacToe()
+    Interface.playGame()
 
 if __name__ == '__main__':
     main()
