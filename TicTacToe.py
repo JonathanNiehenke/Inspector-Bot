@@ -89,13 +89,14 @@ class TicTacToe_Intelligence:
             if self.Engine.gameBoard[Index] == " ":
                 return Index
 
-    def getNextVecWin(self, x, y, Iter):
-        if self.countAlongVec(Iter(x, y)) == 2:
-            return self.getEmpty(Iter(x, y))
+    def getNextVecWin(self, Vector):
+        repeatVector = tuple(Vector)
+        if self.countAlongVec(repeatVector) == 2:
+            return self.getEmpty(repeatVector)
 
     def getWinningMoves(self, move):
         x, y = move[0], move[-1]
-        winAlongVecs = (self.getNextVecWin(x, y, Iter)
+        winAlongVecs = (self.getNextVecWin(Iter(x, y))
                         for Iter in self.Engine.vectorIters)
         return [move for move in winAlongVecs if move is not None]
 
@@ -104,29 +105,28 @@ class TicTacToe_Intelligence:
             if self.Engine.gameBoard[Index] == " ":
                 self.Engine.gameBoard[Index] = Player 
 
-    def countRowWins(self, y, winCount):
-        if (self.Engine.isVectorWin(self.Engine.rowIter(None, y))):
-            for x in range(3):
-                winCount[(x, y)] += 1
+    def countVectorWins(self, Vector, winCount):
+        repeatVector = tuple(Vector)
+        if self.Engine.isVectorWin(repeatVector):
+            for Index in repeatVector:
+                winCount[Index] += 1
 
-    def countColWins(self, x, winCount):
-        if (self.Engine.isVectorWin(self.Engine.colIter(x, None))):
-            for y in range(3):
-                winCount[(x, y)] += 1
+    def countBoardWins(self, winCount):
+        for z in range(3):
+            self.countVectorWins(self.Engine.rowIter(None, z), winCount)
+            self.countVectorWins(self.Engine.colIter(z, None), winCount)
+        self.countVectorWins(self.Engine.bDiagIter(0, 0), winCount)
+        self.countVectorWins(self.Engine.fDiagIter(2, 0), winCount)
 
-    def countBDiagWins(self, winCount):
-        if (self.Engine.isVectorWin(self.Engine.bDiagIter(0, 0))):
-            for z in range(3):
-                winCount[(z, z)] += 1
-
-    def countFDiagWins(self, winCount):
-        if (self.Engine.isVectorWin(self.Engine.fDiagIter(2, 0))):
-            for z in range(3):
-                winCount[(z, 2 - z)] += 1
-
-    def foreachVec(self, func, *args):
-        for vec in range(3):
-            func(vec, *args)
+    def countWinPossibilities(self, Player):
+        winCount = OrderedDict((f"{x}, {y}", 0) for x, y in twoDimIter(3, 3))
+        self.Engine.currentPlayer = Player
+        backup = (self.Engine.currentPlayer, self.Engine.gameBoard.copy())
+        self.fillGameBoard(Player)
+        self.countBoardWins(winCount)
+        self.Engine.currentPlayer, self.Engine.gameBoard = backup
+        # self.draw(winCount.values())
+        return winCount
 
     def invertCount(self, countDict):
         invDict = {}
@@ -138,28 +138,14 @@ class TicTacToe_Intelligence:
         nestedSort = sorted(self.invertCount(countDict).items(), reverse=True)
         return [v for _, l in nestedSort for v in l]
 
-    def countWinPossibilities(self, Player):
-        winCount = OrderedDict((Index, 0) for Index in twoDimIter(3, 3))
-        self.Engine.currentPlayer = Player
-        backup = self.Engine.gameBoard.copy()  # Create backup
-        self.fillGameBoard(Player)
-        self.foreachVec(self.countRowWins, winCount)
-        self.foreachVec(self.countColWins, winCount)
-        self.countBDiagWins(winCount)
-        self.countFDiagWins(winCount)
-        self.Engine.gameBoard = backup  # Restore backup
-        # self.draw(winCount.values())
-        return winCount
-
     def makeMove(self):
         # print(self.priorityMoves)
         while self.priorityMoves:
             move = self.priorityMoves.popleft()
             if self.Engine.gameBoard.get(move, "") == " ": break
         else:
-            for Index in self.sortCount(
+            for move in self.sortCount(
                     self.countWinPossibilities(self.Engine.getNextPlayer())):
-                move = "{}, {}".format(*Index)
                 if self.Engine.gameBoard.get(move, "") == " ": break
         self.Engine.makeMove(move)
         self.priorityMoves.extend(self.getWinningMoves(move))
