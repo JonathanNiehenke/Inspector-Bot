@@ -118,8 +118,7 @@ class TicTacToe_Intelligence:
         self.countVectorWins(self.Engine.bDiagIter(0, 0), winCount)
         self.countVectorWins(self.Engine.fDiagIter(2, 0), winCount)
 
-    def countWinPossibilities(self, Player):
-        winCount = OrderedDict((f"{x}, {y}", 0) for x, y in twoDimIter(3, 3))
+    def countWinPossibilities(self, winCount, Player):
         self.Engine.currentPlayer = Player
         backup = (self.Engine.currentPlayer, self.Engine.gameBoard.copy())
         self.fillGameBoard(Player)
@@ -144,9 +143,13 @@ class TicTacToe_Intelligence:
             move = self.priorityMoves.popleft()
             if self.Engine.gameBoard.get(move, "") == " ": break
         else:
-            for move in self.sortCount(
-                    self.countWinPossibilities(self.Engine.getNextPlayer())):
-                if self.Engine.gameBoard.get(move, "") == " ": break
+            winCount = OrderedDict(
+                (f"{x}, {y}", 0) for x, y in twoDimIter(3, 3))
+            self.countWinPossibilities(winCount, self.Engine.currentPlayer)
+            self.countWinPossibilities(winCount, self.Engine.getNextPlayer())
+            for move in self.sortCount(winCount):
+                if self.Engine.gameBoard.get(move, "") == " ":
+                    break
         self.Engine.makeMove(move)
         self.priorityMoves.extend(self.getWinningMoves(move))
         return move
