@@ -100,29 +100,57 @@ class TicTacToe_Intelligence:
                         for Iter in self.Engine.vectorIters)
         return [move for move in winAlongVecs if move is not None]
 
-    def fillGameBoard(self, Player):
-        for Index in self.Engine.gameBoard:
-            if self.Engine.gameBoard[Index] == " ":
-                self.Engine.gameBoard[Index] = Player 
+    def countFocus(self, Vector, Counter):
+        nextPlayer, repeatVector = self.Engine.getNextPlayer(), tuple(Vector)
+        isNextPlayerPresent = any(self.Engine.gameBoard[Index] == nextPlayer
+                                  for Index in repeatVector)
+        if not isNextPlayerPresent:
+            Focus = self.countAlongVec(repeatVector)
+            for Index in repeatVector:
+                Counter[Index] += Focus
 
-    def countVectorWins(self, Vector, winCount):
+    def applyToBoardVectors(self, Func, *args):
+        for z in range(3):
+            Func(self.Engine.rowIter(None, z), *args)
+            Func(self.Engine.colIter(z, None), *args)
+        Func(self.Engine.bDiagIter(0, 0), *args)
+        Func(self.Engine.fDiagIter(2, 0), *args)
+
+    def countEnemyFocus(self):
+        focusCount = OrderedDict(
+            (f"{x}, {y}", 0) for x, y in twoDimIter(3, 3))
+        self.applyToBoardVectors(self.countFocus, focusCount)
+        # self.draw(focusCount.values())
+        return focusCount
+
+    def getDeathMoves(self):
+        focusCount = self.countEnemyFocus()
+        enemyFocus = (Idx for Idx, Cnt in focusCount.items() if Cnt > 1)
+        moves = []
+        for Index in enemyFocus:
+            backup = (self.Engine.currentPlayer, self.Engine.gameBoard.copy())
+            self.Engine.currentPlayer = self.Engine.getNextPlayer()
+            self.Engine.gameBoard[Index] = self.Engine.currentPlayer
+            moves.extend(self.getWinningMoves(Index))
+            self.Engine.currentPlayer, self.Engine.gameBoard = backup
+        return moves
+
+    def countWins(self, Vector, Counter):
         repeatVector = tuple(Vector)
         if self.Engine.isVectorWin(repeatVector):
             for Index in repeatVector:
-                winCount[Index] += 1
+                Counter[Index] += 1
 
-    def countBoardWins(self, winCount):
-        for z in range(3):
-            self.countVectorWins(self.Engine.rowIter(None, z), winCount)
-            self.countVectorWins(self.Engine.colIter(z, None), winCount)
-        self.countVectorWins(self.Engine.bDiagIter(0, 0), winCount)
-        self.countVectorWins(self.Engine.fDiagIter(2, 0), winCount)
+    def fillGameBoard(self, Player):
+        for Index in self.Engine.gameBoard:
+            if self.Engine.gameBoard[Index] == " ":
+                self.Engine.gameBoard[Index] = Player
 
     def countWinPossibilities(self, winCount, Player):
-        self.Engine.currentPlayer = Player
         backup = (self.Engine.currentPlayer, self.Engine.gameBoard.copy())
+        self.Engine.currentPlayer = Player
         self.fillGameBoard(Player)
-        self.countBoardWins(winCount)
+        self.applyToBoardVectors(self.countWins, winCount)
         self.Engine.currentPlayer, self.Engine.gameBoard = backup
         # self.draw(winCount.values())
         return winCount
@@ -143,12 +171,14 @@ class TicTacToe_Intelligence:
             move = self.priorityMoves.popleft()
             if self.Engine.gameBoard.get(move, "") == " ": break
         else:
+            deathMoves = self.getDeathMoves()
             winCount = OrderedDict(
                 (f"{x}, {y}", 0) for x, y in twoDimIter(3, 3))
             self.countWinPossibilities(winCount, self.Engine.currentPlayer)
             self.countWinPossibilities(winCount, self.Engine.getNextPlayer())
             for move in self.sortCount(winCount):
-                if self.Engine.gameBoard.get(move, "") == " ":
+                if (self.Engine.gameBoard.get(move, "") == " " and
+                   move not in deathMoves):
                     break
         self.Engine.makeMove(move)
         self.priorityMoves.extend(self.getWinningMoves(move))
