@@ -16,8 +16,14 @@ class TicTacToeEngine:
         self.vectorIters = (
             self.rowIter, self.colIter, self.bDiagIter, self.fDiagIter)
 
+    def __getitem__(self, Index):
+        return self.gameBoard[Index]
+
+    def __setitem__(self, Index, Value):
+        self.gameBoard[Index] = Value
+
     def isPlayer(self, Index):
-        return self.gameBoard[Index] == self.currentPlayer 
+        return self[Index] == self.currentPlayer 
 
     def playersVector(self, Vector):
         return (self.isPlayer(Index) for Index in Vector)
@@ -48,7 +54,7 @@ class TicTacToeEngine:
 
     def makeMove(self, Index):
         if (self.gameBoard.get(Index, "") == " "):  # Is a valid move
-            self.gameBoard[Index] = self.currentPlayer = self.getNextPlayer()
+            self[Index] = self.currentPlayer = self.getNextPlayer()
             self.currentMove += 1
             self.recentMove = Index
             return True
@@ -62,7 +68,7 @@ class TicTacToeEngine:
 
     def reset(self):
         for Index in self.gameBoard:
-            self.gameBoard[Index] = " "
+            self[Index] = " "
             self.currentMove = 0
 
 
@@ -86,7 +92,7 @@ class TicTacToe_Intelligence:
 
     def getEmpty(self, Vector):
         for Index in Vector:
-            if self.Engine.gameBoard[Index] == " ":
+            if self.Engine[Index] == " ":
                 return Index
 
     def getNextVecWin(self, Vector):
@@ -102,7 +108,7 @@ class TicTacToe_Intelligence:
 
     def countFocus(self, Vector, Counter):
         nextPlayer, repeatVector = self.Engine.getNextPlayer(), tuple(Vector)
-        isNextPlayerPresent = any(self.Engine.gameBoard[Index] == nextPlayer
+        isNextPlayerPresent = any(self.Engine[Index] == nextPlayer
                                   for Index in repeatVector)
         if not isNextPlayerPresent:
             Focus = self.countAlongVec(repeatVector)
@@ -130,7 +136,7 @@ class TicTacToe_Intelligence:
         for Index in enemyFocus:
             backup = (self.Engine.currentPlayer, self.Engine.gameBoard.copy())
             self.Engine.currentPlayer = self.Engine.getNextPlayer()
-            self.Engine.gameBoard[Index] = self.Engine.currentPlayer
+            self.Engine[Index] = self.Engine.currentPlayer
             moves.extend(self.getWinningMoves(Index))
             self.Engine.currentPlayer, self.Engine.gameBoard = backup
         return moves
@@ -143,8 +149,8 @@ class TicTacToe_Intelligence:
 
     def fillGameBoard(self, Player):
         for Index in self.Engine.gameBoard:
-            if self.Engine.gameBoard[Index] == " ":
-                self.Engine.gameBoard[Index] = Player
+            if self.Engine[Index] == " ":
+                self.Engine[Index] = Player
 
     def countWinPossibilities(self, winCount, Player):
         backup = (self.Engine.currentPlayer, self.Engine.gameBoard.copy())
