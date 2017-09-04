@@ -14,7 +14,8 @@ class ConsoleTicTacToe:
         self.cpu = cpu if cpu else TicTacToe_Intelligence()
         vs_cpu, self.game_amount = self.provide_options()
         self.game_count = 0
-        self.play_game = self.play_game_hvc if vs_cpu else  self.play_game_hvh
+        self.play_game = partial(self.play_game_set,
+            self.play_game_hvc if vs_cpu else  self.play_game_hvh)
 
     def provide_options(self):
         vsCPU = input("1. Player or 2. CPU: ") == "2"
@@ -65,11 +66,11 @@ Game {}:
                 print("Tie game")
             input("Press Enter...")
 
-    def play_gameSet(self):
+    def play_game_set(self, playGame):
         for self.game_count in range(self.game_amount):
-            self.play_game()
+            playGame()
             self.engine.reset()
-            if self.play_game == self.play_game_hvc:
+            if playGame == self.play_game_hvc:
                 self.cpu.reset()
                 if self.game_count % 2 == 0:
                     self.engine.make_move(self.cpu.make_move())
@@ -201,10 +202,10 @@ class GuiTicTacToe:
 
 def main():
     try:
-        Interface = GuiTicTacToe() if argv[1] == "GUI" else ConsoleTicTacToe()
+        Interface = GuiTicTacToe if argv[1] == "GUI" else ConsoleTicTacToe
     except:
-        Interface = ConsoleTicTacToe()
-    Interface.play_game()
+        Interface = ConsoleTicTacToe
+    Interface().play_game()
 
 if __name__ == '__main__':
     main()
