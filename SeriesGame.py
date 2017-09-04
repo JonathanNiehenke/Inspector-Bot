@@ -40,10 +40,10 @@ class SeriesGame:
                 if (z < self.height and d - z < self.width))
 
     def b_diag_iter(self, x, y=None):
-        d = x if y is None else int(x) - int(y) + self.width
-        colMax = self.width - 1
-        return (f"{z}, {colMax - (d - z)}" for z in range(d + 1)
-                if (z < self.width and colMax - d + z >= 0))
+        rowMax = self.height - 1
+        d = x if y is None else int(x) - int(y) + rowMax
+        return (f"{z}, {rowMax - (d - z)}" for z in range(d + 1)
+                if (z < self.width and rowMax - (d - z) >= 0))
 
     def is_vector_win(self, Vector):
         Series = largestSeries = 0
@@ -51,7 +51,7 @@ class SeriesGame:
             if self.game_board[Index] == self.player:
                 Series += 1
             elif Series > largestSeries:
-                largestSeries = Series
+                largestSeries, Series = Series, 0
         return max(Series, largestSeries) >= self.win
 
     def is_win(self):
@@ -59,7 +59,7 @@ class SeriesGame:
         return any(self.is_vector_win(Iter(x, y)) for Iter in self.vector_iters)
 
     def is_end(self):
-        return self.is_win() or self.current_move == 9
+        return self.is_win() or self.current_move == self.tie
 
     def make_move(self, Index):
         if (self.game_board.get(Index, "") == " "):  # Is a valid move
