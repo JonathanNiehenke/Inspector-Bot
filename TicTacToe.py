@@ -6,6 +6,13 @@ class TicTacToeEngine(SeriesGame):
     def __init__(self):
         SeriesGame.__init__(self, height=3, width=3, win=3)
 
+    def b_diag_iter(self, x, y):
+        return (f"{z}, {z}" for z in range(3)) if x == y else ()
+
+    def f_diag_iter(self, x, y):
+        return ((f"{z}, {2 - z}" for z in range(3))
+                if int(x) == 2 - int(y) else ())
+
 
 class TicTacToe_Intelligence:
 
@@ -54,9 +61,8 @@ class TicTacToe_Intelligence:
         for z in range(3):
             Func(self.engine.row_iter(z, None), *args)
             Func(self.engine.col_iter(None, z), *args)
-        for d in range(self.engine.diags):
-            Func(self.engine.b_diag_iter(d), *args)
-            Func(self.engine.f_diag_iter(d), *args)
+        Func(self.engine.b_diag_iter(0, 0), *args)
+        Func(self.engine.f_diag_iter(0, 2), *args)
 
     def count_enemy_focus(self):
         focusCount = OrderedDict((Index, 0) for Index in iter(self.engine))
@@ -113,6 +119,7 @@ class TicTacToe_Intelligence:
             if self.engine.game_board.get(move, "") == " ": break
         else:
             deathMoves = self.get_death_moves()
+            # print(deathMoves)
             winCount = OrderedDict((Index, 0) for Index in iter(self.engine))
             self.count_board_wins(winCount, self.engine.get_player())
             self.count_board_wins(winCount, self.engine.get_next_player())
