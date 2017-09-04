@@ -1,75 +1,10 @@
 from collections import OrderedDict, deque
+from SeriesGame import two_dim_iter, SeriesGame
 
-def two_dim_iter(width, height):
-    for y in range(height):
-        for x in range(width):
-            yield (x, y)
-
-class TicTacToeEngine:
+class TicTacToeEngine(SeriesGame):
 
     def __init__(self):
-        self.current_move = 0;
-        self.recent_move = "0, 1";
-        self.current_player = "X";
-        self.game_board = OrderedDict(
-            (f"{x}, {y}", " ") for x, y in two_dim_iter(3, 3))
-        self.vector_iters = (
-            self.row_Iter, self.col_iter, self.b_diag_iter, self.f_diag_iter)
-
-    def __getitem__(self, Index):
-        return self.game_board[Index]
-
-    def __setitem__(self, Index, Value):
-        self.game_board[Index] = Value
-
-    def is_player(self, Index):
-        return self[Index] == self.current_player 
-
-    def players_vector(self, Vector):
-        return (self.is_player(Index) for Index in Vector)
-
-    def row_Iter(self, _, y):
-        return (f"{x}, {y}" for x in range(3))
-
-    def col_iter(self, x, _):
-        return (f"{x}, {y}" for y in range(3))
-
-    def b_diag_iter(self, x, y):
-        return (f"{z}, {z}" for z in range(3)) if x == y else ()
-
-    def f_diag_iter(self, x, y):
-        return ((f"{z}, {2 - z}" for z in range(3))
-                if int(x) == 2 - int(y) else ())
-
-    def is_vector_win(self, Vector):
-        # Prevent returning True if empty as expected from diagonals
-        return all(self.players_vector(Vector)) if Vector else False
-
-    def is_win(self):
-        x, y = self.recent_move[0], self.recent_move[-1]
-        return any(self.is_vector_win(Iter(x, y)) for Iter in self.vector_iters)
-
-    def is_end(self):
-        return self.is_win() or self.current_move == 9
-
-    def make_move(self, Index):
-        if (self.game_board.get(Index, "") == " "):  # Is a valid move
-            self[Index] = self.current_player = self.get_next_player()
-            self.current_move += 1
-            self.recent_move = Index
-            return True
-        return False
-
-    def get_player(self):
-        return self.current_player
-
-    def get_next_player(self):
-        return "O" if self.current_move % 2 else "X"
-
-    def reset(self):
-        for Index in self.game_board:
-            self[Index] = " "
-            self.current_move = 0
+        SeriesGame.__init__(self, column=3, row=3, win=3)
 
 
 class TicTacToe_Intelligence:
