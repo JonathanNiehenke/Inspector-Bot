@@ -52,10 +52,11 @@ class TicTacToe_Intelligence:
 
     def apply_to_board_vectors(self, Func, *args):
         for z in range(3):
-            Func(self.engine.row_Iter(None, z), *args)
-            Func(self.engine.col_iter(z, None), *args)
-        Func(self.engine.b_diag_iter(0, 0), *args)
-        Func(self.engine.f_diag_iter(2, 0), *args)
+            Func(self.engine.row_iter(z, None), *args)
+            Func(self.engine.col_iter(None, z), *args)
+        for d in range(self.engine.diags):
+            Func(self.engine.b_diag_iter(d), *args)
+            Func(self.engine.f_diag_iter(d), *args)
 
     def count_enemy_focus(self):
         focusCount = OrderedDict(
@@ -69,11 +70,11 @@ class TicTacToe_Intelligence:
         enemyFocus = (Idx for Idx, Cnt in focusCount.items() if Cnt > 1)
         moves = []
         for Index in enemyFocus:
-            backup = (self.engine.current_player, self.engine.game_board.copy())
-            self.engine.current_player = self.engine.get_next_player()
-            self.engine[Index] = self.engine.current_player
+            backup = (self.engine.player, self.engine.game_board.copy())
+            self.engine.player = self.engine.get_next_player()
+            self.engine[Index] = self.engine.player
             moves.extend(self.get_winning_moves(Index))
-            self.engine.current_player, self.engine.game_board = backup
+            self.engine.player, self.engine.game_board = backup
         return moves
 
     def count_wins(self, Vector, Counter):
@@ -88,11 +89,11 @@ class TicTacToe_Intelligence:
                 self.engine[Index] = Player
 
     def count_board_wins(self, winCount, Player):
-        backup = (self.engine.current_player, self.engine.game_board.copy())
-        self.engine.current_player = Player
+        backup = (self.engine.player, self.engine.game_board.copy())
+        self.engine.player = Player
         self.fill_game_board(Player)
         self.apply_to_board_vectors(self.count_wins, winCount)
-        self.engine.current_player, self.engine.game_board = backup
+        self.engine.player, self.engine.game_board = backup
         # self.draw(winCount.values())
         return winCount
 
@@ -115,7 +116,7 @@ class TicTacToe_Intelligence:
             deathMoves = self.get_death_moves()
             winCount = OrderedDict(
                 (f"{x}, {y}", 0) for x, y in two_dim_iter(3, 3))
-            self.count_board_wins(winCount, self.engine.current_player)
+            self.count_board_wins(winCount, self.engine.get_player())
             self.count_board_wins(winCount, self.engine.get_next_player())
             for move in self.sort_count(winCount):
                 if (self.engine.game_board.get(move, "") == " " and
