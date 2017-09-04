@@ -1,19 +1,13 @@
 from collections import OrderedDict
 
-def two_dim_iter(width, height):
-    for y in range(height):
-        for x in range(width):
-            yield (x, y)
-
 class SeriesGame:
 
-    def __init__(self, column, row, win, playerSet="XO"):
-        self.cols, self.rows, self.win = column, row, win
-        self.diags, self.tie = column + row - 1, column * row
+    def __init__(self, height, width, win, playerSet="XO"):
+        self.height, self.width, self.win = height, width, win
+        self.diags, self.tie = width + height - 1, width * height
         self.player_set, self.player = playerSet, playerSet[0]
         self.current_move, self.recent_move = 0, "0, 0"
-        self.game_board = OrderedDict(
-            (f"{x}, {y}", " ") for x, y in two_dim_iter(column, row))
+        self.game_board = {Index: " " for Index in self.__iter__()}
         self.vector_iters = (
             self.row_iter, self.col_iter, self.f_diag_iter, self.b_diag_iter)
 
@@ -23,6 +17,11 @@ class SeriesGame:
     def __setitem__(self, Index, Value):
         self.game_board[Index] = Value
 
+    def __iter__(self):
+        for y in range(self.height):
+            for x in range(self.width):
+                yield f"{x}, {y}"
+
     def is_player(self, Index):
         return self[Index] == self.player 
 
@@ -30,21 +29,21 @@ class SeriesGame:
         return (self.is_player(Index) for Index in Vector)
 
     def row_iter(self, x, _):
-        return (f"{x}, {y}" for y in range(self.rows))
+        return (f"{x}, {y}" for y in range(self.height))
 
     def col_iter(self, _, y):
-        return (f"{x}, {y}" for x in range(self.cols))
+        return (f"{x}, {y}" for x in range(self.width))
 
     def f_diag_iter(self, x, y=None):
         d = x if y is None else int(x) + int(y)
         return (f"{d - z}, {z}" for z in range(d + 1)
-                if (z < self.rows and d - z < self.cols))
+                if (z < self.height and d - z < self.width))
 
     def b_diag_iter(self, x, y=None):
-        d = x if y is None else int(x) - int(y) + self.cols
-        colMax = self.cols - 1
+        d = x if y is None else int(x) - int(y) + self.width
+        colMax = self.width - 1
         return (f"{z}, {colMax - (d - z)}" for z in range(d + 1)
-                if (z < self.cols and colMax - d + z >= 0))
+                if (z < self.width and colMax - d + z >= 0))
 
     def is_vector_win(self, Vector):
         Series = largestSeries = 0
@@ -80,3 +79,6 @@ class SeriesGame:
         for Index in self.game_board:
             self[Index] = " "
             self.current_move = 0
+
+    def get_grid_values(self):
+        return (self[Index] for Index in iter(self))

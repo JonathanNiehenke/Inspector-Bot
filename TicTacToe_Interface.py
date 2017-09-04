@@ -5,7 +5,7 @@ import tkinter as tk
 import os
 
 
-from TicTacToe import two_dim_iter, TicTacToeEngine, TicTacToe_Intelligence
+from TicTacToe import TicTacToeEngine, TicTacToe_Intelligence
 
 class ConsoleTicTacToe:
 
@@ -22,6 +22,7 @@ class ConsoleTicTacToe:
         return vsCPU, gamesAmount
 
     def draw(self):
+        gridValues = (self.engine[Index] for Index in iter(self.engine))
         os.system("cls")
         print("""
 Game {}:
@@ -30,7 +31,7 @@ Game {}:
 {} | {} | {}
 --+---+--
 {} | {} | {}
-        """.format(self.game_count + 1, *self.engine.game_board.values()))
+        """.format(self.game_count + 1, *gridValues))
         print()
 
     def player_move(self):
@@ -158,10 +159,9 @@ class GuiTicTacToe:
         else:
             self.window.destroy()
 
-    def button_press_hvh(self, x, y):
-        move = f"{x}, {y}"
-        if self.engine.make_move(move):
-            self.buttons[move].configure(text=self.engine.get_player())
+    def button_press_hvh(self, Index):
+        if self.engine.make_Index(Index):
+            self.buttons[Index].configure(text=self.engine.get_player())
             if (self.engine.is_end()):
                 self.end_game()
             self.msg_text.set(f"Player {self.engine.get_next_player()} to move.")
@@ -174,20 +174,20 @@ class GuiTicTacToe:
             self.end_game()
         self.msg_text.set(f"Player {self.engine.get_next_player()} to move.")
 
-    def button_press_hvc(self, x, y):
-        move = f"{x}, {y}"
-        if self.engine.make_move(move):
-            self.buttons[move].configure(text=self.engine.get_player())
+    def button_press_hvc(self, Index):
+        if self.engine.make_move(Index):
+            self.buttons[Index].configure(text=self.engine.get_player())
             if (self.engine.is_end()):
                 self.end_game()
             else:
-                self.cpu.oppenent_move(move)
+                self.cpu.oppenent_move(Index)
                 self.cpu_move()
 
     def create_buttons(self):
         buttons = {}
-        for x, y in two_dim_iter(3, 3):
-            thisButtonPress = partial(self.button_press, x, y)
+        for Index in iter(self.engine):
+            x, y = int(Index[0]), int(Index[-1])
+            thisButtonPress = partial(self.button_press, Index)
             button = tk.Button(self.window, text=" ", font=('Courier', 18),
                                command=thisButtonPress)
             button.grid(row=(y+1), column=x, padx=8, pady=8)

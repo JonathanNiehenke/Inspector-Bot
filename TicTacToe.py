@@ -1,10 +1,10 @@
 from collections import OrderedDict, deque
-from SeriesGame import two_dim_iter, SeriesGame
+from SeriesGame import SeriesGame
 
 class TicTacToeEngine(SeriesGame):
 
     def __init__(self):
-        SeriesGame.__init__(self, column=3, row=3, win=3)
+        SeriesGame.__init__(self, height=3, width=3, win=3)
 
 
 class TicTacToe_Intelligence:
@@ -59,8 +59,7 @@ class TicTacToe_Intelligence:
             Func(self.engine.f_diag_iter(d), *args)
 
     def count_enemy_focus(self):
-        focusCount = OrderedDict(
-            (f"{x}, {y}", 0) for x, y in two_dim_iter(3, 3))
+        focusCount = OrderedDict((Index, 0) for Index in iter(self.engine))
         self.apply_to_board_vectors(self.count_focus, focusCount)
         # self.draw(focusCount.values())
         return focusCount
@@ -114,8 +113,7 @@ class TicTacToe_Intelligence:
             if self.engine.game_board.get(move, "") == " ": break
         else:
             deathMoves = self.get_death_moves()
-            winCount = OrderedDict(
-                (f"{x}, {y}", 0) for x, y in two_dim_iter(3, 3))
+            winCount = OrderedDict((Index, 0) for Index in iter(self.engine))
             self.count_board_wins(winCount, self.engine.get_player())
             self.count_board_wins(winCount, self.engine.get_next_player())
             for move in self.sort_count(winCount):
