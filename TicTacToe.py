@@ -59,8 +59,8 @@ class TicTacToe_Intelligence:
 
     def apply_to_board_vectors(self, Func, *args):
         for z in range(3):
-            Func(self.engine.row_iter(z, None), *args)
-            Func(self.engine.col_iter(None, z), *args)
+            Func(self.engine.row_iter(None, z), *args)
+            Func(self.engine.col_iter(z, None), *args)
         Func(self.engine.b_diag_iter(0, 0), *args)
         Func(self.engine.f_diag_iter(0, 2), *args)
 
