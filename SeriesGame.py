@@ -26,12 +26,14 @@ class SeriesGame:
         for Index in Vector:
             yield self[Index] == self.player
 
-    def row_iter(self, x, _):
-        for y in range(self.height):
+    def row_iter(self, _, y, reverse=False):
+        idxLoop = reversed(range(self.width)) if reverse else range(self.width)
+        for x in idxLoop:
             yield f"{x}, {y}"
 
-    def col_iter(self, _, y):
-        for x in range(self.width):
+    def col_iter(self, x, _, reverse=False):
+        idxLoop = reversed(range(self.width)) if reverse else range(self.height)
+        for y in idxLoop:
             yield f"{x}, {y}"
 
     def f_diag_iter(self, x, y=None):
