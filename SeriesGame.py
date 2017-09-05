@@ -22,28 +22,30 @@ class SeriesGame:
             for x in range(self.width):
                 yield f"{x}, {y}"
 
-    def is_player(self, Index):
-        return self[Index] == self.player 
-
     def players_vector(self, Vector):
-        return (self.is_player(Index) for Index in Vector)
+        for Index in Vector:
+            yield self[Index] == self.player
 
     def row_iter(self, x, _):
-        return (f"{x}, {y}" for y in range(self.height))
+        for y in range(self.height):
+            yield f"{x}, {y}"
 
     def col_iter(self, _, y):
-        return (f"{x}, {y}" for x in range(self.width))
+        for x in range(self.width):
+            yield f"{x}, {y}"
 
     def f_diag_iter(self, x, y=None):
         d = x if y is None else int(x) + int(y)
-        return (f"{d - z}, {z}" for z in range(d + 1)
-                if (z < self.height and d - z < self.width))
+        for z in range(d + 1):
+            if (z < self.height and d - z < self.width):
+                yield f"{d - z}, {z}"
 
     def b_diag_iter(self, x, y=None):
         rowMax = self.height - 1
         d = x if y is None else int(x) - int(y) + rowMax
-        return (f"{z}, {rowMax - (d - z)}" for z in range(d + 1)
-                if (z < self.width and rowMax - (d - z) >= 0))
+        for z in range(d + 1):
+            if (z < self.width and rowMax - (d - z) >= 0):
+                yield f"{z}, {rowMax - (d - z)}"
 
     def is_vector_win(self, Vector):
         Series = largestSeries = 0
@@ -76,9 +78,10 @@ class SeriesGame:
         return self.player_set[self.current_move % len(self.player_set)]
 
     def reset(self):
+        self.current_move = 0
         for Index in self.game_board:
             self[Index] = " "
-            self.current_move = 0
 
     def get_grid_values(self):
-        return (self[Index] for Index in iter(self))
+        for Index in iter(self):
+            yield self[Index]
