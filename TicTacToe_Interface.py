@@ -161,7 +161,7 @@ class GuiTicTacToe:
             self.window.destroy()
 
     def button_press_hvh(self, Index):
-        if self.engine.make_Index(Index):
+        if self.engine.make_move(Index):
             self.buttons[Index].configure(text=self.engine.get_player())
             if (self.engine.is_end()):
                 self.end_game()
