@@ -50,13 +50,15 @@ class SeriesGame:
                 yield f"{z}, {rowMax - (d - z)}"
 
     def is_vector_win(self, Vector):
-        Series = largestSeries = 0
+        Series = 0
         for Index in Vector:
             if self.game_board[Index] == self.player:
                 Series += 1
-            elif Series > largestSeries:
-                largestSeries, Series = Series, 0
-        return max(Series, largestSeries) >= self.win
+            elif Series < self.win:
+                Series = 0
+            else:
+                return True
+        return Series >= self.win
 
     def is_win(self):
         x, y = self.recent_move[0], self.recent_move[-1]
