@@ -2,14 +2,14 @@ from functools import partial
 from tkinter import messagebox
 import tkinter as tk
 
-
-from ConnectFour import ConnectFourEngine
+from ConnectFour import ConnectFourEngine, ConnectFour_Intelligence
 
 class GuiConnectFour:
 
     def __init__(self, cpu=None):
         self.engine = ConnectFourEngine()
         self.window = tk.Tk()
+        self.cpu = ConnectFour_Intelligence()
         self.buttons = self.create_buttons()
         self.board = self.create_board()
         self.msg_text = tk.StringVar()
@@ -38,6 +38,7 @@ class GuiConnectFour:
             if (self.engine.is_end()):
                 self.end_game()
             self.msg_text.set(f"Player {self.engine.get_next_player()} to move.")
+            self.cpu.oppenent_move(Index)
 
     def create_buttons(self):
         buttons = []
