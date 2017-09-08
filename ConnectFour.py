@@ -37,6 +37,20 @@ class ConnectFour_Intelligence:
 +--+--+--+--+--+--+--+
         """.format(*values))
 
+    def apply_to_vectors(self, Index, Func, *args):
+        x, y = Index[0], Index[-1]
+        for Iter in self.engine.vector_iters:
+            Func(Iter(x, y), *args)
+
+    def apply_to_all_vectors(self, Func, *args):
+        for z in range(self.engine.height):
+            Func(self.engine.row_iter(None, z), *args)
+        for z in range(self.engine.width):
+            Func(self.engine.col_iter(z, None), *args)
+        for d in range(self.engine.diags):
+            Func(self.engine.b_diag_iter(d), *args)
+            Func(self.engine.f_diag_iter(d), *args)
+
     def fill_game_board(self, Player):
         for Index in self.engine.game_board:
             if self.engine[Index] == " ":
@@ -55,14 +69,6 @@ class ConnectFour_Intelligence:
                 for Index in fourSeries:
                     Counter[Index] += 1
 
-    def apply_to_board_vectors(self, Func, *args):
-        for z in range(self.engine.height):
-            Func(self.engine.row_iter(None, z), *args)
-        for z in range(self.engine.width):
-            Func(self.engine.col_iter(z, None), *args)
-        for d in range(self.engine.diags):
-            Func(self.engine.b_diag_iter(d), *args)
-            Func(self.engine.f_diag_iter(d), *args)
 
     def count_board_wins(self):
         winCount = OrderedDict((Index, 0) for Index in iter(self.engine))
