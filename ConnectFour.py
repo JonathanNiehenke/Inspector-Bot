@@ -5,11 +5,14 @@ class ConnectFourEngine(SeriesGame):
 
     def __init__(self):
         SeriesGame.__init__(self, height=6, width=7, win=4)
+        self.available_moves = [f"{x}, {self.height-1}" for x in range(self.width)]
 
     def make_column_move(self, x):
-        for Index in self.col_iter(x, None, reverse=True):
-            if self.make_move(Index):
-                return Index
+        Index = self.available_moves[x]
+        if self.make_move(Index):
+            y = int(Index[-1]) - 1
+            self.available_moves[x] = f"{x}, {y}"
+            return Index
         return None
 
 class ConnectFour_Intelligence:
