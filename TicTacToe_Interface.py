@@ -5,7 +5,7 @@ import tkinter as tk
 import os
 
 
-from TicTacToe import two_dim_iter, TicTacToeEngine, TicTacToe_Intelligence
+from TicTacToe import TicTacToeEngine, TicTacToe_Intelligence
 
 class ConsoleTicTacToe:
 
@@ -14,7 +14,8 @@ class ConsoleTicTacToe:
         self.cpu = cpu if cpu else TicTacToe_Intelligence()
         vs_cpu, self.game_amount = self.provide_options()
         self.game_count = 0
-        self.play_game = self.play_game_hvc if vs_cpu else  self.play_game_hvh
+        self.play_game = partial(self.play_game_set,
+            self.play_game_hvc if vs_cpu else  self.play_game_hvh)
 
     def provide_options(self):
         vsCPU = input("1. Player or 2. CPU: ") == "2"
@@ -22,6 +23,7 @@ class ConsoleTicTacToe:
         return vsCPU, gamesAmount
 
     def draw(self):
+        gridValues = (self.engine[Index] for Index in iter(self.engine))
         os.system("cls")
         print("""
 Game {}:
@@ -30,7 +32,7 @@ Game {}:
 {} | {} | {}
 --+---+--
 {} | {} | {}
-        """.format(self.game_count + 1, *self.engine.game_board.values()))
+        """.format(self.game_count + 1, *gridValues))
         print()
 
     def player_move(self):
@@ -64,11 +66,11 @@ Game {}:
                 print("Tie game")
             input("Press Enter...")
 
-    def play_gameSet(self):
+    def play_game_set(self, playGame):
         for self.game_count in range(self.game_amount):
-            self.play_game()
+            playGame()
             self.engine.reset()
-            if self.play_game == self.play_game_hvc:
+            if playGame == self.play_game_hvc:
                 self.cpu.reset()
                 if self.game_count % 2 == 0:
                     self.engine.make_move(self.cpu.make_move())
@@ -158,10 +160,9 @@ class GuiTicTacToe:
         else:
             self.window.destroy()
 
-    def button_press_hvh(self, x, y):
-        move = f"{x}, {y}"
-        if self.engine.make_move(move):
-            self.buttons[move].configure(text=self.engine.get_player())
+    def button_press_hvh(self, Index):
+        if self.engine.make_move(Index):
+            self.buttons[Index].configure(text=self.engine.get_player())
             if (self.engine.is_end()):
                 self.end_game()
             self.msg_text.set(f"Player {self.engine.get_next_player()} to move.")
@@ -174,20 +175,20 @@ class GuiTicTacToe:
             self.end_game()
         self.msg_text.set(f"Player {self.engine.get_next_player()} to move.")
 
-    def button_press_hvc(self, x, y):
-        move = f"{x}, {y}"
-        if self.engine.make_move(move):
-            self.buttons[move].configure(text=self.engine.get_player())
+    def button_press_hvc(self, Index):
+        if self.engine.make_move(Index):
+            self.buttons[Index].configure(text=self.engine.get_player())
             if (self.engine.is_end()):
                 self.end_game()
             else:
-                self.cpu.oppenent_move(move)
+                self.cpu.oppenent_move(Index)
                 self.cpu_move()
 
     def create_buttons(self):
         buttons = {}
-        for x, y in two_dim_iter(3, 3):
-            thisButtonPress = partial(self.button_press, x, y)
+        for Index in iter(self.engine):
+            x, y = int(Index[0]), int(Index[-1])
+            thisButtonPress = partial(self.button_press, Index)
             button = tk.Button(self.window, text=" ", font=('Courier', 18),
                                command=thisButtonPress)
             button.grid(row=(y+1), column=x, padx=8, pady=8)
@@ -201,10 +202,10 @@ class GuiTicTacToe:
 
 def main():
     try:
-        Interface = GuiTicTacToe() if argv[1] == "GUI" else ConsoleTicTacToe()
+        Interface = GuiTicTacToe if argv[1] == "GUI" else ConsoleTicTacToe
     except:
-        Interface = ConsoleTicTacToe()
-    Interface.play_game()
+        Interface = ConsoleTicTacToe
+    Interface().play_game()
 
 if __name__ == '__main__':
     main()

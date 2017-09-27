@@ -1,38 +1,10 @@
 from collections import OrderedDict, deque
+from SeriesGame import SeriesGame
 
-def two_dim_iter(width, height):
-    for y in range(height):
-        for x in range(width):
-            yield (x, y)
-
-class TicTacToeEngine:
+class TicTacToeEngine(SeriesGame):
 
     def __init__(self):
-        self.current_move = 0;
-        self.recent_move = "0, 1";
-        self.current_player = "X";
-        self.game_board = OrderedDict(
-            (f"{x}, {y}", " ") for x, y in two_dim_iter(3, 3))
-        self.vector_iters = (
-            self.row_Iter, self.col_iter, self.b_diag_iter, self.f_diag_iter)
-
-    def __getitem__(self, Index):
-        return self.game_board[Index]
-
-    def __setitem__(self, Index, Value):
-        self.game_board[Index] = Value
-
-    def is_player(self, Index):
-        return self[Index] == self.current_player 
-
-    def players_vector(self, Vector):
-        return (self.is_player(Index) for Index in Vector)
-
-    def row_Iter(self, _, y):
-        return (f"{x}, {y}" for x in range(3))
-
-    def col_iter(self, x, _):
-        return (f"{x}, {y}" for y in range(3))
+        SeriesGame.__init__(self, height=3, width=3, win=3)
 
     def b_diag_iter(self, x, y):
         return (f"{z}, {z}" for z in range(3)) if x == y else ()
@@ -40,36 +12,6 @@ class TicTacToeEngine:
     def f_diag_iter(self, x, y):
         return ((f"{z}, {2 - z}" for z in range(3))
                 if int(x) == 2 - int(y) else ())
-
-    def is_vector_win(self, Vector):
-        # Prevent returning True if empty as expected from diagonals
-        return all(self.players_vector(Vector)) if Vector else False
-
-    def is_win(self):
-        x, y = self.recent_move[0], self.recent_move[-1]
-        return any(self.is_vector_win(Iter(x, y)) for Iter in self.vector_iters)
-
-    def is_end(self):
-        return self.is_win() or self.current_move == 9
-
-    def make_move(self, Index):
-        if (self.game_board.get(Index, "") == " "):  # Is a valid move
-            self[Index] = self.current_player = self.get_next_player()
-            self.current_move += 1
-            self.recent_move = Index
-            return True
-        return False
-
-    def get_player(self):
-        return self.current_player
-
-    def get_next_player(self):
-        return "O" if self.current_move % 2 else "X"
-
-    def reset(self):
-        for Index in self.game_board:
-            self[Index] = " "
-            self.current_move = 0
 
 
 class TicTacToe_Intelligence:
@@ -117,14 +59,13 @@ class TicTacToe_Intelligence:
 
     def apply_to_board_vectors(self, Func, *args):
         for z in range(3):
-            Func(self.engine.row_Iter(None, z), *args)
+            Func(self.engine.row_iter(None, z), *args)
             Func(self.engine.col_iter(z, None), *args)
         Func(self.engine.b_diag_iter(0, 0), *args)
-        Func(self.engine.f_diag_iter(2, 0), *args)
+        Func(self.engine.f_diag_iter(0, 2), *args)
 
     def count_enemy_focus(self):
-        focusCount = OrderedDict(
-            (f"{x}, {y}", 0) for x, y in two_dim_iter(3, 3))
+        focusCount = OrderedDict((Index, 0) for Index in iter(self.engine))
         self.apply_to_board_vectors(self.count_focus, focusCount)
         # self.draw(focusCount.values())
         return focusCount
@@ -134,11 +75,11 @@ class TicTacToe_Intelligence:
         enemyFocus = (Idx for Idx, Cnt in focusCount.items() if Cnt > 1)
         moves = []
         for Index in enemyFocus:
-            backup = (self.engine.current_player, self.engine.game_board.copy())
-            self.engine.current_player = self.engine.get_next_player()
-            self.engine[Index] = self.engine.current_player
+            backup = (self.engine.player, self.engine.game_board.copy())
+            self.engine.player = self.engine.get_next_player()
+            self.engine[Index] = self.engine.player
             moves.extend(self.get_winning_moves(Index))
-            self.engine.current_player, self.engine.game_board = backup
+            self.engine.player, self.engine.game_board = backup
         return moves
 
     def count_wins(self, Vector, Counter):
@@ -153,11 +94,11 @@ class TicTacToe_Intelligence:
                 self.engine[Index] = Player
 
     def count_board_wins(self, winCount, Player):
-        backup = (self.engine.current_player, self.engine.game_board.copy())
-        self.engine.current_player = Player
+        backup = (self.engine.player, self.engine.game_board.copy())
+        self.engine.player = Player
         self.fill_game_board(Player)
         self.apply_to_board_vectors(self.count_wins, winCount)
-        self.engine.current_player, self.engine.game_board = backup
+        self.engine.player, self.engine.game_board = backup
         # self.draw(winCount.values())
         return winCount
 
@@ -178,9 +119,9 @@ class TicTacToe_Intelligence:
             if self.engine.game_board.get(move, "") == " ": break
         else:
             deathMoves = self.get_death_moves()
-            winCount = OrderedDict(
-                (f"{x}, {y}", 0) for x, y in two_dim_iter(3, 3))
-            self.count_board_wins(winCount, self.engine.current_player)
+            # print(deathMoves)
+            winCount = OrderedDict((Index, 0) for Index in iter(self.engine))
+            self.count_board_wins(winCount, self.engine.get_player())
             self.count_board_wins(winCount, self.engine.get_next_player())
             for move in self.sort_count(winCount):
                 if (self.engine.game_board.get(move, "") == " " and
